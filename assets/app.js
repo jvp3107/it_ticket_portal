@@ -49,7 +49,7 @@ async function apiPost(payload) {
     if (userActions.includes(payload.action)) {
         targetUrl = DB_CONFIG.userApiUrl;
     } else if (payload.action === 'db_read' || payload.action === 'db_upsert' || payload.action === 'db_delete') {
-        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies') {
+        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings') {
             targetUrl = DB_CONFIG.userApiUrl;
         }
     }
@@ -78,8 +78,8 @@ function getSLAString(startDateStr, priority, status) {
 }
 
 function validateSession() {
-    const storedClient = localStorage.getItem('spread_client_session');
-    const storedAdmin = localStorage.getItem('spread_admin_session');
+    const storedClient = sessionStorage.getItem('spread_client_session');
+    const storedAdmin = sessionStorage.getItem('spread_admin_session');
 
     if (storedClient) {
         const session = JSON.parse(storedClient);
@@ -95,10 +95,10 @@ setInterval(validateSession, 60000);
 document.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
 
-    const storedClient = localStorage.getItem('spread_client_session');
+    const storedClient = sessionStorage.getItem('spread_client_session');
     if (storedClient) clientSession = JSON.parse(storedClient);
 
-    const storedAdmin = localStorage.getItem('spread_admin_session');
+    const storedAdmin = sessionStorage.getItem('spread_admin_session');
     if (storedAdmin) {
         const adData = JSON.parse(storedAdmin);
         IT_ROLE = adData.role; IT_NAME = adData.name;
@@ -130,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function logoutGlobal(auto = false) {
     IT_ROLE = ""; IT_NAME = ""; clientSession = null;
-    localStorage.removeItem('spread_client_session');
-    localStorage.removeItem('spread_admin_session');
+    sessionStorage.removeItem('spread_client_session');
+    sessionStorage.removeItem('spread_admin_session');
     if (activeChatTimer) { clearInterval(activeChatTimer); activeChatTimer = null; }
     stopClientPolling(); stopNocPolling();
     if (auto) alert("Your session has expired. Please log in again.");
@@ -143,20 +143,41 @@ function logoutGlobal(auto = false) {
 // ==========================================
 async function fetchAppConfig() {
     try {
-        const res = await apiPost({ action: "db_read", target_sheet: "App_Config" });
+        const res = await apiPost({ action: "db_read", target_sheet: "Settings" });
         const data = await res.json();
-
+        
         appConfigData = (data.data || []).map(row => {
-            let clean = {};
-            for (let key in row) clean[key.toLowerCase()] = String(row[key] || "");
-            return clean;
+            let key = String(row.Key || row.key || "").trim();
+            let val = String(row.Value || row.value || "").trim();
+            
+            if (key.startsWith('Feature_')) {
+                return { type: 'FeatureFlag', value: key.replace('Feature_', ''), status: val, default: 'true' };
+            }
+            return { type: 'Setting', value: key, default: val };
         });
+
+        const tokenSetting = appConfigData.find(c => c.value === 'TelegramBotToken');
+        const chatSetting = appConfigData.find(c => c.value === 'TelegramChatId');
+        if (tokenSetting && document.getElementById('setBotToken')) document.getElementById('setBotToken').value = tokenSetting.default;
+        if (chatSetting && document.getElementById('setChatId')) document.getElementById('setChatId').value = chatSetting.default;
 
         populateStaticFormDropdowns();
         renderDynamicModuleNav();
         renderFeatureFlagsAdminUI();
         enforceFeatureFlags();
-    } catch (e) { console.warn("Failed to load App_Config."); }
+    } catch (e) { console.warn("Failed to load Settings DB."); }
+}
+
+async function savePlatformSettings() {
+    const token = document.getElementById('setBotToken').value.trim();
+    const chatId = document.getElementById('setChatId').value.trim();
+    
+    try {
+        await apiPost({ action: 'db_upsert', target_sheet: 'Settings', primary_key: 'Key', Key: 'TelegramBotToken', Value: token });
+        await apiPost({ action: 'db_upsert', target_sheet: 'Settings', primary_key: 'Key', Key: 'TelegramChatId', Value: chatId });
+        alert("Platform settings saved to database successfully!");
+        fetchAppConfig();
+    } catch(e) { alert("Error saving settings."); }
 }
 
 function populateStaticFormDropdowns() {
@@ -167,27 +188,21 @@ function populateStaticFormDropdowns() {
 
     const reqSelect = document.getElementById('requestType');
     if (reqSelect && isDropdownEnabled('RequestTypeDropdown')) {
-        const reqTypes = appConfigData.filter(c => c.type === 'RequestType');
-        if (reqTypes.length > 0) {
-            reqSelect.innerHTML = reqTypes.map(r => `<option value="${r.value}" ${r.default === 'true' ? 'selected' : ''}>${r.value}</option>`).join('');
-            handleRequestTypeChange();
-        }
+        const reqTypes = [{value: 'Incident'}, {value: 'Service'}];
+        reqSelect.innerHTML = reqTypes.map(r => `<option value="${r.value}">${r.value}</option>`).join('');
+        handleRequestTypeChange(); 
     }
 
     const priSelect = document.getElementById('priority');
     if (priSelect && isDropdownEnabled('PriorityDropdown')) {
-        const priorities = appConfigData.filter(c => c.type === 'Priority');
-        if (priorities.length > 0) {
-            priSelect.innerHTML = priorities.map(r => `<option value="${r.value}" ${r.default === 'true' ? 'selected' : ''}>${r.value}</option>`).join('');
-        }
+        const priorities = [{value: 'Low'}, {value: 'Medium'}, {value: 'High'}];
+        priSelect.innerHTML = priorities.map(r => `<option value="${r.value}" ${r.value === 'Medium' ? 'selected' : ''}>${r.value}</option>`).join('');
     }
 
     const conSelect = document.getElementById('contactMethod');
     if (conSelect && isDropdownEnabled('ContactMethodDropdown')) {
-        const contacts = appConfigData.filter(c => c.type === 'ContactMethod');
-        if (contacts.length > 0) {
-            conSelect.innerHTML = contacts.map(r => `<option value="${r.value}" ${r.default === 'true' ? 'selected' : ''}>${r.value}</option>`).join('');
-        }
+        const contacts = [{value: 'Email'}, {value: 'Phone'}, {value: 'Microsoft Teams'}];
+        conSelect.innerHTML = contacts.map(r => `<option value="${r.value}">${r.value}</option>`).join('');
     }
 }
 
@@ -218,14 +233,9 @@ function renderFeatureFlagsAdminUI() {
     const container = document.getElementById('featureFlagsContainer');
     if (!container) return;
 
-    // ADDED: Make the container perfectly scrollable inline via JavaScript
-    container.style.maxHeight = "380px";
-    container.style.overflowY = "auto";
-    container.style.paddingRight = "8px";
-
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
         return;
     }
 
@@ -249,10 +259,11 @@ function renderFeatureFlagsAdminUI() {
 
 async function toggleFeatureFlag(flagName, isChecked) {
     const newStatus = isChecked ? 'enabled' : 'disabled';
+    const dbKey = `Feature_${flagName}`;
     try {
         await apiPost({
-            action: 'db_upsert', target_sheet: 'App_Config', primary_key: 'value',
-            type: 'FeatureFlag', value: flagName, status: newStatus
+            action: 'db_upsert', target_sheet: 'Settings', primary_key: 'Key',
+            Key: dbKey, Value: newStatus
         });
         await fetchAppConfig();
     } catch (e) { alert("Failed to update feature flag."); }
@@ -338,7 +349,7 @@ async function handleClientLogin(e) {
         const res = await apiPost({ action: 'login_client', email: email, password: pass }); const data = await res.json();
         if (data.status === 'success') {
             clientSession = { email: email, company: data.company, name: data.name, role: data.role, phone: data.phone, peers: data.peers || [], loginTime: Date.now() };
-            localStorage.setItem('spread_client_session', JSON.stringify(clientSession));
+            sessionStorage.setItem('spread_client_session', JSON.stringify(clientSession));
             goTo('client-dashboard.html');
         } else { alert(data.message || "Invalid credentials."); }
     } catch (e) { alert("Database Connection Failed."); }
@@ -353,7 +364,7 @@ async function handleITLogin(e) {
     try {
         const res = await apiPost({ action: 'login_admin', email: email, password: pass }); const data = await res.json();
         if (data.status === 'success') {
-            localStorage.setItem('spread_admin_session', JSON.stringify({ role: data.role, name: data.name, loginTime: Date.now() }));
+            sessionStorage.setItem('spread_admin_session', JSON.stringify({ role: data.role, name: data.name, loginTime: Date.now() }));
             goTo('admin-dashboard.html');
         } else { alert(data.message || "Invalid credentials."); }
     } catch (e) { alert("Database Connection Failed."); }
@@ -779,7 +790,7 @@ function filterDashboard() {
                 globalUsersList.forEach(u => { if (u.role === 'Master Admin' || u.role === 'Tier 1 Support') { assignSelect += `<option value="${escapeHTML(u.name)}" ${(t.assigned_to === u.name) ? 'selected' : ''}>${escapeHTML(u.name)}</option>`; } });
                 assignSelect += `</select>`;
             } else {
-                if (!t.assigned_to || t.assigned_to === "") { assignSelect = `<button onclick="assignTicketToUser('${t.id}', '${IT_NAME}')" class="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500 transition block mt-2 w-full text-center shadow-md active:scale-95">Assign to Me</button>`; }
+                if (!t.assigned_to || t.assigned_to === "") { assignSelect = `<button onclick="assignTicketToUser('${t.id}', '${IT_NAME}')" class="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500 transition block mt-2 w-full text-center shadow-sm">Assign to Me</button>`; }
                 else if (t.assigned_to === IT_NAME) { assignSelect = `<button onclick="assignTicketToUser('${t.id}', '')" class="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-lg font-bold hover:bg-slate-200 transition block mt-2 w-full text-center">Unassign Ticket</button>`; }
             }
         }
@@ -838,8 +849,8 @@ function renderVisits() {
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
     let sorted = [...globalVisits].sort((a, b) => {
-        let dA = a['out time'] || a.out_time || a.visit_date || a.date || 0;
-        let dB = b['out time'] || b.out_time || b.visit_date || b.date || 0;
+        let dA = a['In Time'] || a['in time'] || a.in_time || a.visit_date || a.date || 0;
+        let dB = b['In Time'] || b['in time'] || b.in_time || b.visit_date || b.date || 0;
         return new Date(dB) - new Date(dA);
     });
 
@@ -848,12 +859,32 @@ function renderVisits() {
         let statColor = v.status === 'Completed' ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : v.status === 'Cancelled' ? 'text-rose-700 bg-rose-100 border-rose-300' : 'text-amber-700 bg-amber-100 border-amber-300';
         let mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.location)}`;
 
-        let rawDate = v['out time'] || v.out_time || v.visit_date || v.date;
-        let d = 'No Date';
-        if (rawDate) {
-            let parsedDate = new Date(rawDate);
-            if (!isNaN(parsedDate)) { d = parsedDate.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); }
-            else { d = String(rawDate); }
+        let inRaw = v['In Time'] || v['in time'] || v.in_time;
+        let outRaw = v['Out Time'] || v['out time'] || v.out_time || v.visit_date || v.date;
+
+        let dIn = inRaw ? new Date(inRaw) : null;
+        let dOut = outRaw ? new Date(outRaw) : null;
+
+        let inDisplay = "No Entry Time";
+        if (dIn && !isNaN(dIn)) { 
+            inDisplay = dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); 
+        }
+
+        let exitDisplay = "Pending";
+        if (dOut && !isNaN(dOut)) { 
+            exitDisplay = dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); 
+        } else if (outRaw) { 
+            exitDisplay = String(outRaw); 
+        }
+
+        let durationDisplay = "N/A";
+        if (dIn && dOut && !isNaN(dIn) && !isNaN(dOut)) {
+            let diffMs = dOut - dIn;
+            if (diffMs >= 0) {
+                let hrs = Math.floor(diffMs / (1000 * 60 * 60));
+                let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                durationDisplay = `${hrs}h ${mins}m`;
+            } else { durationDisplay = "Invalid"; }
         }
 
         let ticketBadge = '';
@@ -864,7 +895,13 @@ function renderVisits() {
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-xl flex flex-col hover:shadow-md transition-shadow gap-2">
-            <div class="flex justify-between items-start mb-2"><h4 class="font-black text-sm text-slate-800 flex items-center flex-wrap gap-2">${escapeHTML(v.company)} <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${escapeHTML(v.status)}</span> ${ticketBadge}</h4><span class="text-[10px] text-slate-500 font-bold whitespace-nowrap">${d}</span></div>
+            <div class="flex justify-between items-start mb-2"><h4 class="font-black text-sm text-slate-800 flex items-center flex-wrap gap-2">${escapeHTML(v.company)} <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${escapeHTML(v.status)}</span> ${ticketBadge}</h4><span class="text-[10px] text-slate-500 font-bold whitespace-nowrap">${inDisplay}</span></div>
+            
+            <div class="flex justify-between items-center bg-slate-50 border border-slate-200 rounded-lg p-2 my-1">
+                <div class="text-[10px]"><span class="block font-bold text-slate-400 uppercase">Exit Time</span><span class="font-black text-slate-700">${exitDisplay}</span></div>
+                <div class="text-[10px] text-right"><span class="block font-bold text-slate-400 uppercase">Total Duration</span><span class="font-black text-blue-600">${durationDisplay}</span></div>
+            </div>
+
             <p class="text-xs text-blue-600 font-bold mb-1"><i class="fa-solid fa-user-tie mr-1"></i> ${escapeHTML(v.it_staff)}</p>
             <p class="text-xs text-slate-600 mb-2 whitespace-pre-wrap">${escapeHTML(v.purpose)}</p>
             ${v.notes ? `<p class="text-[10px] text-slate-500 italic mb-2">Outcome: ${escapeHTML(v.notes)}</p>` : ''}
@@ -885,6 +922,7 @@ async function saveVisitLog(e) {
         action: 'db_upsert', target_sheet: 'Visits', primary_key: 'visit_id',
         visit_id: vId, it_staff: IT_NAME, company: document.getElementById('visitCompany').value,
         location: document.getElementById('visitLocation').value.trim(),
+        'In Time': document.getElementById('visitInTime').value,
         'Out Time': document.getElementById('visitDate').value,
         ticket_ref: selectedTickets, purpose: document.getElementById('visitPurpose').value.trim(),
         status: document.getElementById('visitStatus').value, notes: document.getElementById('visitNotes').value.trim()
@@ -894,7 +932,7 @@ async function saveVisitLog(e) {
 }
 
 function clearVisitForm() {
-    document.getElementById('visitId').value = ''; document.getElementById('visitCompany').value = ''; document.getElementById('visitLocation').value = ''; document.getElementById('visitDate').value = ''; document.getElementById('visitTicketRef').selectedIndex = -1; document.getElementById('visitPurpose').value = ''; document.getElementById('visitStatus').value = 'Scheduled'; document.getElementById('visitNotes').value = ''; document.querySelectorAll('#noc-visitsView .itsm-input').forEach(i => i.classList.remove('has-val'));
+    document.getElementById('visitId').value = ''; document.getElementById('visitCompany').value = ''; document.getElementById('visitLocation').value = ''; document.getElementById('visitInTime').value = ''; document.getElementById('visitDate').value = ''; document.getElementById('visitTicketRef').selectedIndex = -1; document.getElementById('visitPurpose').value = ''; document.getElementById('visitStatus').value = 'Scheduled'; document.getElementById('visitNotes').value = ''; document.querySelectorAll('#noc-visitsView .itsm-input').forEach(i => i.classList.remove('has-val'));
 }
 
 async function deleteVisit(id) {
@@ -911,9 +949,17 @@ function autoFillVisitDetails() {
         const locInput = document.getElementById('visitLocation'); locInput.value = comp.address; locInput.classList.add('has-val');
     }
 
+    const inTimeInput = document.getElementById('visitInTime');
     const dateInput = document.getElementById('visitDate');
     const now = new Date(); const tzOffset = now.getTimezoneOffset() * 60000;
-    dateInput.value = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    
+    // Auto-fill In Time
+    inTimeInput.value = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    inTimeInput.classList.add('has-val');
+
+    // Auto-fill Out Time to 1 Hour ahead by default
+    const defaultOutTime = new Date(now.getTime() + (60 * 60 * 1000));
+    dateInput.value = new Date(defaultOutTime.getTime() - tzOffset).toISOString().slice(0, 16);
     dateInput.classList.add('has-val');
 
     const ticketSelect = document.getElementById('visitTicketRef');
