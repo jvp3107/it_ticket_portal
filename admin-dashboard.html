@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT NOC Dashboard | Spread Technical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS/libs/pptxgen.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body class="flex flex-col min-h-screen font-sans antialiased">
+
+    <!-- TICKET MODAL -->
+    <div id="ticketModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div id="ticketModal"
+            class="glass-panel w-full max-w-5xl max-h-[90vh] rounded-[32px] flex flex-col overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center p-6 border-b border-slate-200 glass-surface bg-white/80">
+                <div class="w-full">
+                    <h3 class="font-extrabold text-2xl text-blue-600 mb-1" id="modalRequesterName">User Name</h3>
+                    <div class="flex items-center gap-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <span id="modalTicketId"
+                            class="text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">INC-000000</span>
+                        &bull; <span id="modalTicketDate">Date</span>
+                    </div>
+                </div>
+                <button onclick="closeTicketModal()"
+                    class="w-10 h-10 rounded-full glass-surface hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-grow overflow-hidden flex flex-col lg:flex-row bg-white">
+                <div class="w-full lg:w-3/5 p-6 overflow-y-auto border-r border-slate-200" id="modalTicketDetails">
+                    <div class="mb-8">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Ticket Lifecycle
+                        </p>
+                        <div class="flex items-center" id="modalPipeline"></div>
+                    </div>
+                    <div class="mb-6 border-b border-slate-200 pb-6">
+                        <h4 class="text-sm font-bold text-slate-800 mb-3">Subject: <span
+                                class="font-normal text-slate-600" id="modalSubject">Subject</span></h4>
+                        <div class="flex flex-wrap gap-2 mb-4" id="modalBadges"></div>
+                        <div class="glass-surface p-5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <p class="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed" id="modalDescription">
+                            </p>
+                        </div>
+                        <div id="modalAttachmentContainer" class="mt-4"></div>
+                        <div id="modalRemoteContainer"></div>
+                    </div>
+                    <div
+                        class="grid grid-cols-2 gap-4 glass-surface p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Requester
+                                Contact</p>
+                            <p class="text-xs text-slate-700 font-medium" id="modalRequesterContact"></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">IT Assignment
+                            </p>
+                            <p class="text-xs font-bold text-emerald-600" id="modalAssignment"></p>
+                            <p class="text-[10px] text-slate-500" id="modalAssignDate"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="w-full lg:w-2/5 flex flex-col bg-slate-50 h-[50vh] lg:h-auto relative">
+                    <div
+                        class="p-4 border-b border-slate-200 flex justify-between items-center bg-white absolute top-0 w-full z-10 shadow-sm">
+                        <h4 class="font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center">
+                            <i class="fa-brands fa-whatsapp mr-2 text-emerald-500 text-lg"></i> Live Chat
+                        </h4>
+                    </div>
+                    <div id="modalChatHistory"
+                        class="flex-grow overflow-y-auto p-4 pt-16 flex flex-col scroll-smooth chat-bg pb-20"></div>
+                    <div
+                        class="p-4 glass-surface border-t border-slate-200 bg-white absolute bottom-0 w-full z-10 shadow-lg">
+                        <div class="flex gap-2 relative">
+                            <input type="hidden" id="modalActiveTicketId">
+                            <input type="text" id="modalChatInput"
+                                onkeypress="if(event.key === 'Enter') postModalChatMessage()"
+                                class="flex-grow px-5 py-3 text-sm border border-slate-300 bg-white rounded-full outline-none focus:border-blue-500 text-slate-800 transition-colors shadow-inner"
+                                placeholder="Type a message...">
+                            <button onclick="postModalChatMessage()" id="modalChatSendBtn"
+                                class="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center hover:bg-blue-500 transition-colors shadow-md active:scale-95 flex-shrink-0">
+                                <i class="fa-solid fa-paper-plane text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN MANAGEMENT MODALS -->
+    <div id="editCorpUserModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white"
+            id="editCorpUserModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i
+                    class="fa-solid fa-user-pen text-emerald-500 mr-2"></i>Edit Profile</h3>
+            <input type="hidden" id="editCorpUserEmail">
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-building input-icon"></i><select
+                    id="editCorpUserCompany" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span
+                    class="itsm-label" style="left:44px;">Company</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon"></i><input type="tel"
+                    id="editCorpUserPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                    style="left:44px;">Phone Number</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-sitemap input-icon"></i><select
+                    id="editCorpUserManager" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span
+                    class="itsm-label" style="left:44px;">Assign Manager</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tag input-icon"></i><select
+                    id="editCorpUserRole" class="itsm-input appearance-none pl-10 cursor-pointer">
+                    <option value="Client">Standard Employee</option>
+                    <option value="Approver">Approver / Manager</option>
+                </select><span class="itsm-label" style="left:44px;">Role</span></div>
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5"><button
+                    onclick="closeEditCorpUserModal()"
+                    class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button
+                    onclick="saveCorpUserEdits(event)"
+                    class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editITStaffModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white"
+            id="editITStaffModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-shield text-blue-500 mr-2"></i>
+                Edit IT Staff</h3>
+            <input type="hidden" id="editITStaffEmail">
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon text-slate-400"></i><input
+                    type="tel" id="editITStaffPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                    style="left:44px;">Phone Number</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-brands fa-telegram input-icon text-blue-500"></i><input
+                    type="text" id="editITStaffTelegram" class="itsm-input pl-10" placeholder=" "><span
+                    class="itsm-label" style="left:44px;">Telegram Chat ID</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tag input-icon text-slate-400"></i><select
+                    id="editITStaffRole" class="itsm-input appearance-none pl-10 cursor-pointer">
+                    <option value="Tier 1 Support">Tier 1 Support</option>
+                    <option value="Master Admin">Master Admin</option>
+                </select><span class="itsm-label" style="left:44px;">Privilege Role</span></div>
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5"><button
+                    onclick="closeEditITStaffModal()"
+                    class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button
+                    onclick="saveITStaffEdits(event)"
+                    class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editCompanyModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-md transform scale-95 transition-transform duration-300 bg-white"
+            id="editCompanyModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-building text-blue-500 mr-2"></i>
+                Edit Company Profile</h3>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-signature input-icon"></i><input type="text"
+                    id="editCompName"
+                    class="itsm-input pl-10 text-slate-500 bg-slate-100 cursor-not-allowed border-slate-200"
+                    readonly><span class="itsm-label" style="left:44px;">Company Registry Name</span></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-globe input-icon"></i><input type="text"
+                        id="editCompDomain" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                        style="left:44px;">Primary Domain</span></div>
+                <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon"></i><input type="text"
+                        id="editCompPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                        style="left:44px;">Office Phone</span></div>
+            </div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-location-dot input-icon"></i><input type="text"
+                    id="editCompAddress" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                    style="left:44px;">Office Address</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tie input-icon"></i><input type="text"
+                    id="editCompContact" class="itsm-input pl-10" placeholder=" "><span class="itsm-label"
+                    style="left:44px;">Primary IT Contact</span></div>
+            <div class="itsm-input-wrapper mb-4"><textarea id="editCompNotes" rows="2"
+                    class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea><span class="itsm-label"
+                    style="left:16px;">Internal SLA / Routing Notes</span></div>
+            <div class="flex justify-end gap-3 mt-6 border-t border-slate-200 pt-5"><button
+                    onclick="closeEditCompanyModal()"
+                    class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button
+                    onclick="saveCompanyEdits(event)" id="btnSaveCompany"
+                    class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Save
+                    Profile</button></div>
+        </div>
+    </div>
+
+    <!-- GLOBAL HEADER -->
+    <header class="glass-header sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-md border border-blue-500/50">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div class="border-l-2 border-slate-300 pl-4">
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">SPREAD TECHNICAL</h1>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">IT Service Management</p>
+                </div>
+            </div>
+            <button onclick="logoutGlobal()" id="globalLogoutBtn"
+                class="bg-rose-50 border border-rose-200 text-rose-600 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-rose-100 transition-all flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        <div id="nocDashboardView" class="w-full max-w-[1600px] mx-auto block">
+
+            <!-- Enterprise Admin Navigation Tabs -->
+            <div class="admin-nav-container mb-10 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
+                <button onclick="switchNocTab('all')" id="nocTab-all"
+                    class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-layer-group"></i> Global
+                    Queue</button>
+                <button onclick="switchNocTab('visits')" id="nocTab-visits"
+                    class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-map-location-dot"></i>
+                    Field Visits</button>
+                <button onclick="switchNocTab('analytics')" id="nocTab-analytics"
+                    class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-chart-pie"></i>
+                    Analytics & Exports</button>
+                <button onclick="switchNocTab('admin')" id="nocTab-admin"
+                    class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-users-gear"></i> Admin
+                    Management</button>
+            </div>
+
+            <!-- TAB: Global Queue View -->
+            <div id="noc-allView" class="animate-fade-in">
+
+                <!-- KPI Cards (6 Tiles) -->
+                <div class="grid grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-blue-50 border-blue-100 border cursor-pointer"
+                        onclick="setQuickFilter('All')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-blue-300"><i
+                                class="fa-solid fa-layer-group"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-blue-500">Total</p>
+                        <h3 class="text-4xl font-black text-blue-700" id="kpiTotal">0</h3>
+                    </div>
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-violet-50 border-violet-100 border cursor-pointer"
+                        onclick="setQuickFilter('Unassigned')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-violet-300"><i
+                                class="fa-solid fa-user-slash"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-violet-500">Unassigned</p>
+                        <h3 class="text-4xl font-black text-violet-700" id="kpiUnassigned">0</h3>
+                    </div>
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-amber-50 border-amber-100 border cursor-pointer"
+                        onclick="setQuickFilter('Pending Approval')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-amber-300"><i
+                                class="fa-solid fa-clock"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-amber-600">Pending</p>
+                        <h3 class="text-4xl font-black text-amber-700" id="kpiOpen">0</h3>
+                    </div>
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-cyan-50 border-cyan-100 border cursor-pointer"
+                        onclick="setQuickFilter('Assigned')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-cyan-300"><i
+                                class="fa-solid fa-user-check"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-cyan-600">Assigned</p>
+                        <h3 class="text-4xl font-black text-cyan-700" id="kpiAssigned">0</h3>
+                    </div>
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-purple-50 border-purple-100 border cursor-pointer"
+                        onclick="setQuickFilter('Working')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-purple-300"><i
+                                class="fa-solid fa-gears"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-purple-500">Working</p>
+                        <h3 class="text-4xl font-black text-purple-700" id="kpiWorking">0</h3>
+                    </div>
+                    <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-emerald-50 border-emerald-100 border cursor-pointer"
+                        onclick="setQuickFilter('Resolved')">
+                        <div class="absolute -right-2 -top-2 opacity-20 text-7xl text-emerald-300"><i
+                                class="fa-solid fa-check-double"></i></div>
+                        <p class="text-xs font-black uppercase tracking-widest mb-1 text-emerald-600">Resolved</p>
+                        <h3 class="text-4xl font-black text-emerald-700" id="kpiResolved">0</h3>
+                    </div>
+                </div>
+
+                <!-- Main Queue Table -->
+                <div class="glass-panel rounded-[32px] shadow-sm overflow-hidden border border-slate-200 bg-white">
+                    <div
+                        class="bg-white p-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200">
+                        <div class="flex items-center" id="queueHeaderActions">
+                            <h2 class="text-2xl font-black text-slate-800"><i
+                                    class="fa-solid fa-list-check text-blue-600 mr-3"></i> IT Master Queue</h2>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" id="dashSearch" onkeyup="filterDashboard()"
+                                    class="pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-full text-sm font-medium outline-none w-56 focus:w-72 transition-all focus:border-blue-400 shadow-inner text-slate-800 placeholder-slate-400"
+                                    placeholder="Search ID or Name...">
+                            </div>
+                            <select id="dashStatusFilter" onchange="filterDashboard()"
+                                class="py-3 px-6 bg-slate-50 border border-slate-200 rounded-full text-sm font-bold outline-none cursor-pointer hover:bg-slate-100 transition shadow-sm text-slate-700">
+                                <option value="All">All Statuses</option>
+                                <option value="Unassigned">Unassigned</option>
+                                <option value="Pending Approval">Pending Approval</option>
+                                <option value="Monitoring">Monitoring</option>
+                                <option value="Assigned">Assigned</option>
+                                <option value="Working">Working</option>
+                                <option value="Resolved">Resolved</option>
+                            </select>
+                            <button onclick="fetchDashboardTickets()"
+                                class="w-11 h-11 bg-slate-50 border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-100 transition active:scale-95 shadow-sm text-slate-600"
+                                title="Refresh Queue">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <button onclick="exportGlobalQueueExcel()"
+                                class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-full text-sm font-black transition flex items-center gap-2 shadow-md active:scale-95 border border-emerald-500">
+                                <i class="fa-solid fa-file-excel"></i> Export View
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-50 flex gap-3 border-b border-slate-200">
+                        <button onclick="bulkDeleteTickets()"
+                            class="px-5 py-2 bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-700 border border-rose-200 text-xs font-black rounded-lg transition shadow-sm">
+                            <i class="fa-solid fa-trash mr-2"></i> Delete Selected
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto min-h-[500px] max-h-[800px] relative bg-white">
+                        <table class="w-full text-left text-sm border-collapse" id="dashboardTable">
+                            <thead class="table-header-custom">
+                                <tr class="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                                    <th class="px-5 py-5 w-12 text-center cursor-default"><input type="checkbox"
+                                            id="selectAllCheckbox" onclick="toggleAllCheckboxes(this)"
+                                            class="w-4 h-4 cursor-pointer accent-blue-600"></th>
+                                    <th class="px-5 py-5 group" onclick="sortTable('id')">Ticket ID <i id="sortIcon_id"
+                                            class="fa-solid fa-sort sort-icon"></i></th>
+                                    <th class="px-6 py-5 group" onclick="sortTable('date')">SLA Engine <i
+                                            id="sortIcon_date" class="fa-solid fa-sort sort-icon sort-active"></i></th>
+                                    <th class="px-6 py-5 group" onclick="sortTable('subject')">Incident Details <i
+                                            id="sortIcon_subject" class="fa-solid fa-sort sort-icon"></i></th>
+                                    <th class="px-6 py-5 text-center group" onclick="sortTable('status')">Status /
+                                        Actions <i id="sortIcon_status" class="fa-solid fa-sort sort-icon"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardTableBody" class="divide-y divide-slate-200">
+                                <!-- Dynamic rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: FIELD VISITS & LOCATIONS -->
+            <div id="noc-visitsView" class="hidden animate-fade-in max-w-6xl mx-auto">
+                <div class="mb-10 text-center">
+                    <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Client Visit Log & Location Mapping
+                    </h2>
+                    <p class="text-slate-500 mt-3 font-medium">Track field assignments and on-site client interactions.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Add Visit Form -->
+                    <div
+                        class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-emerald-500 bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6"><i
+                                class="fa-solid fa-location-dot text-emerald-600 mr-2"></i> Schedule / Log Visit</h3>
+                        <form onsubmit="saveVisitLog(event)" class="space-y-4">
+                            <input type="hidden" id="visitId">
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="visitCompany" required
+                                    class="itsm-input appearance-none pl-4 cursor-pointer"
+                                    onchange="autoFillVisitDetails()"></select>
+                                <span class="itsm-label" style="left:16px;">Client Company *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="visitLocation" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Map Location / Branch *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="datetime-local" id="visitDate" required class="itsm-input pl-4"
+                                    placeholder=" ">
+                                <span class="itsm-label" style="left:16px;">Out Time (Date & Time) *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="visitTicketRef" multiple
+                                    class="itsm-input appearance-none pl-4 cursor-pointer text-blue-700 font-bold bg-blue-50/50 overflow-y-auto"
+                                    onchange="autoFillPurposeFromTicket()"
+                                    style="min-height: 100px; padding-top: 25px; padding-bottom: 10px;">
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Linked Tickets (Hold Ctrl to select
+                                    multiple)</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="visitPurpose" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Purpose *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="visitStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="Scheduled" selected>Scheduled</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Status</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0">
+                                <textarea id="visitNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4"
+                                    placeholder=" "></textarea>
+                                <span class="itsm-label" style="left:16px;">Outcome / Notes</span>
+                            </div>
+
+                            <div class="flex gap-2 mt-4">
+                                <button type="button" onclick="clearVisitForm()"
+                                    class="w-1/3 bg-slate-100 text-slate-600 border border-slate-200 font-bold py-3 rounded-full hover:bg-slate-200 transition-all text-xs">Clear</button>
+                                <button type="submit" id="btnSaveVisit"
+                                    class="w-2/3 bg-emerald-600 text-white font-bold py-3 rounded-full shadow-md hover:-translate-y-1 hover:bg-emerald-500 transition-all text-sm">Save
+                                    Log</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Visit History List -->
+                    <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 flex flex-col h-full shadow-md bg-white">
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
+                            <h3 class="font-black text-slate-800 text-xl whitespace-nowrap"><i
+                                    class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i> Visit History</h3>
+                            <div class="flex gap-2">
+                                <button onclick="fetchVisits()"
+                                    class="bg-white border border-slate-300 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition active:scale-95 shadow-sm"><i
+                                        class="fa-solid fa-rotate mr-1"></i> Sync</button>
+                            </div>
+                        </div>
+                        <div id="visitLogsContainer" class="space-y-4 overflow-y-auto flex-grow pr-2"
+                            style="max-height: 600px;">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ANALYTICS -->
+            <div id="noc-analyticsView" class="hidden animate-fade-in max-w-6xl mx-auto">
+                <div class="mb-10 text-center">
+                    <h2 class="text-4xl font-black text-slate-800">Analytics & Metrics</h2>
+                    <p class="text-slate-500 mt-3 font-medium">Platform utilization and company-specific ticketing data.
+                    </p>
+                </div>
+
+                <!-- Company Metrics Grid -->
+                <div class="mb-10">
+                    <h3 class="font-black text-slate-800 text-xl mb-6 ml-2"><i
+                            class="fa-solid fa-building text-blue-600 mr-3"></i> Client Infrastructure Tickets</h3>
+                    <div id="companyCardsGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <!-- Cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Main Chart Panel -->
+                <div class="glass-panel rounded-[32px] p-10 mb-10 shadow-md bg-white">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-5">
+                        <h3 class="font-black text-slate-800 text-2xl"><i
+                                class="fa-solid fa-chart-spline text-blue-600 mr-3"></i> Graphical Analytics</h3>
+
+                        <div
+                            class="flex flex-wrap gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl w-full md:w-auto shadow-sm">
+                            <button onclick="exportFullRawTickets()"
+                                class="bg-emerald-600 border border-emerald-500 text-white px-6 py-2.5 rounded-full text-xs font-bold hover:bg-emerald-500 transition shadow-sm active:scale-95 flex items-center gap-2 mr-2">
+                                <i class="fa-solid fa-database"></i> Raw Data Export
+                            </button>
+                            <div class="w-px bg-slate-300"></div>
+                            <button onclick="exportChartExcel()"
+                                class="bg-white border border-slate-300 text-emerald-600 px-5 py-2.5 rounded-full text-xs font-bold hover:bg-slate-50 transition shadow-sm active:scale-95">
+                                <i class="fa-solid fa-chart-pie mr-2"></i> Excel
+                            </button>
+                            <button onclick="exportChartPPT()"
+                                class="bg-white border border-slate-300 text-orange-600 px-5 py-2.5 rounded-full text-xs font-bold hover:bg-slate-50 transition shadow-sm active:scale-95">
+                                <i class="fa-solid fa-file-powerpoint mr-2"></i> PPT
+                            </button>
+                            <button onclick="exportChartPDF()"
+                                class="bg-white border border-slate-300 text-rose-600 px-5 py-2.5 rounded-full text-xs font-bold hover:bg-slate-50 transition shadow-sm active:scale-95">
+                                <i class="fa-solid fa-file-pdf mr-2"></i> PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div class="w-full h-96 relative bg-slate-50 rounded-2xl p-6 shadow-inner border border-slate-200">
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ADMIN MANAGEMENT HUB -->
+            <div id="noc-adminView" class="hidden animate-fade-in max-w-6xl mx-auto">
+                <div class="mb-10 text-center">
+                    <h2 class="text-4xl font-black text-slate-800">Admin Management Hub</h2>
+                    <p class="text-slate-500 mt-3 font-medium">Centralized controls for directory and integrations.</p>
+                </div>
+
+                <!-- Enterprise Sub-Navigation -->
+                <div class="admin-nav-container mb-8 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
+                    <button onclick="switchAdminTab('corp')" id="admTabBtn-corp"
+                        class="ent-tab-btn ent-tab-active whitespace-nowrap">Corporate Users</button>
+                    <button onclick="switchAdminTab('companies')" id="admTabBtn-companies"
+                        class="ent-tab-btn ent-tab-inactive whitespace-nowrap">Company Directory</button>
+                    <button onclick="switchAdminTab('it')" id="admTabBtn-it"
+                        class="ent-tab-btn ent-tab-inactive whitespace-nowrap">IT Staff</button>
+                    <button onclick="switchAdminTab('apps')" id="admTabBtn-apps"
+                        class="ent-tab-btn ent-tab-inactive whitespace-nowrap">App Connections & Flags</button>
+                </div>
+
+                <!-- Sub-tab: Corporate Users -->
+                <div id="admTab-corp" class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+
+                    <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6"><i
+                                class="fa-solid fa-user-plus text-emerald-600 mr-2"></i> Add Client User</h3>
+                        <form onsubmit="createCorporateUser(event)" class="space-y-5">
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="newUserCompany" required
+                                    class="itsm-input appearance-none pl-4 cursor-pointer"
+                                    onchange="updateManagerDropdown()"></select>
+                                <span class="itsm-label" style="left:16px;">Company Name</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newUserName" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Employee Name</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="email" id="newUserEmail" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Corporate Email</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="tel" id="newUserPhone" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Phone Number (Optional)</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="newUserRole" class="itsm-input appearance-none cursor-pointer pl-4"
+                                    required>
+                                    <option value="Client" selected>Standard Employee</option>
+                                    <option value="Approver">Department Manager / Approver</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Portal Role</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="newUserManager" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="">No Manager / Self</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Manager Name (Optional)</span>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-emerald-600 text-white font-bold py-4 rounded-full shadow-md border border-emerald-500/30 hover:bg-emerald-500 hover:-translate-y-1 transition-all mt-4">Generate
+                                User</button>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 flex flex-col h-full shadow-md bg-white">
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
+                            <h3 class="font-black text-slate-800 text-xl whitespace-nowrap"><i
+                                    class="fa-solid fa-sitemap text-emerald-600 mr-2"></i> Client Hierarchy</h3>
+
+                            <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end">
+                                <select id="corpUserCompanyFilter" onchange="renderUsersList()"
+                                    class="px-5 py-2.5 bg-white border border-slate-300 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-sm">
+                                    <option value="All">All Companies</option>
+                                </select>
+                                <div class="relative">
+                                    <i
+                                        class="fa-solid fa-search absolute left-5 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                                    <input type="text" id="corpUserSearch" onkeyup="renderUsersList()"
+                                        class="w-full pl-12 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-medium outline-none text-slate-800 placeholder-slate-400 shadow-inner"
+                                        placeholder="Search users...">
+                                </div>
+                                <button onclick="exportUsersExcel()"
+                                    class="bg-emerald-600 border border-emerald-500 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-sm hover:bg-emerald-500 transition-colors">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="corporateUsersList" class="space-y-5 overflow-y-auto flex-grow pr-2"
+                            style="max-height: 600px;">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-tab: Companies Directory -->
+                <div id="admTab-companies" class="hidden grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                    <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6"><i
+                                class="fa-solid fa-building text-blue-600 mr-2"></i> Register Company</h3>
+                        <form onsubmit="registerNewCompany(event)" class="space-y-4">
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newRegCompanyName" required class="itsm-input pl-4"
+                                    placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Company Name *</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newRegDomain" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Primary Domain</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newRegAddress" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Address</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newRegContact" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">IT Contact Person</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="tel" id="newRegPhone" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Support Phone</span>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-blue-600 text-white font-bold py-4 rounded-full shadow-md hover:-translate-y-1 hover:bg-blue-500 transition-all mt-4">Register
+                                Company</button>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6 border-b border-slate-200 pb-5"><i
+                                class="fa-solid fa-list-check text-blue-600 mr-2"></i> Registered Companies</h3>
+                        <div id="registeredCompaniesList" class="space-y-4 max-h-[600px] overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+
+                <!-- Sub-tab: IT Staff -->
+                <div id="admTab-it" class="hidden grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                    <div
+                        class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-blue-500 bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6"><i
+                                class="fa-solid fa-user-shield text-blue-600 mr-2"></i> Provision IT Staff</h3>
+                        <form onsubmit="registerNewAdmin(event)" class="space-y-5">
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="newAdminName" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Staff Name</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="email" id="newAdminEmail" required class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Staff Email Address</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="newAdminRole" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="Tier 1 Support" selected>Tier 1 Support</option>
+                                    <option value="Master Admin">Master Admin</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Role</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0 mt-5">
+                                <input type="text" id="newAdminTelegram" class="itsm-input pl-4" placeholder=" "
+                                    autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Telegram Chat ID (Optional)</span>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-slate-800 text-white font-bold py-4 rounded-full shadow-md hover:bg-slate-700 transition-all mt-4">Provision
+                                Account</button>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6 border-b border-slate-200 pb-5"><i
+                                class="fa-solid fa-users-gear text-blue-600 mr-2"></i> IT Directory</h3>
+                        <div id="itAdminsList" class="space-y-4 max-h-[500px] overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+
+                <!-- Sub-tab: Platform Settings, Feature Flags & Apps -->
+                <div id="admTab-apps" class="hidden animate-fade-in max-w-5xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                        <!-- Notifications -->
+                        <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                            <div class="flex items-center mb-8">
+                                <div
+                                    class="w-14 h-14 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-2xl mr-5 shadow-sm">
+                                    <i class="fa-brands fa-telegram"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-black text-xl text-slate-800">Platform Settings</h3>
+                                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">API &
+                                        Notifications</p>
+                                </div>
+                            </div>
+                            <div class="space-y-5 mb-8">
+                                <div>
+                                    <label
+                                        class="text-xs font-bold text-slate-600 mb-2 block uppercase tracking-wider">Telegram
+                                        Bot Token</label>
+                                    <input type="text" id="setBotToken"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 text-slate-800 shadow-inner"
+                                        placeholder="e.g. 12345:ABCDE...">
+                                </div>
+                                <div>
+                                    <label
+                                        class="text-xs font-bold text-slate-600 mb-2 block uppercase tracking-wider">Telegram
+                                        Chat ID(s) - Comma Separated</label>
+                                    <input type="text" id="setChatId"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 text-slate-800 shadow-inner"
+                                        placeholder="e.g. 712453173, -100987654321">
+                                </div>
+                                <div
+                                    class="flex items-center justify-between bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                    <span class="text-sm font-bold text-slate-700">Enable Telegram Alerts</span>
+                                    <input type="checkbox" id="setTelegramEnable"
+                                        class="w-5 h-5 cursor-pointer accent-blue-600">
+                                </div>
+                                <div
+                                    class="flex items-center justify-between bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                    <span class="text-sm font-bold text-slate-700">Enable Admin Email Alerts</span>
+                                    <input type="checkbox" id="setEmailEnable"
+                                        class="w-5 h-5 cursor-pointer accent-blue-600">
+                                </div>
+                            </div>
+                            <button onclick="savePlatformSettings()"
+                                class="w-full bg-slate-800 text-white py-4 rounded-full text-sm font-bold shadow-md hover:bg-slate-700 transition-colors active:scale-95">Save
+                                Configurations</button>
+                        </div>
+
+                        <!-- App Links & Feature Flags Control -->
+                        <div class="flex flex-col gap-8">
+
+                            <!-- FEATURE FLAGS ADMIN PANEL -->
+                            <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                                <div class="flex items-center mb-6">
+                                    <div
+                                        class="w-14 h-14 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl mr-5 shadow-sm">
+                                        <i class="fa-solid fa-toggle-on"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-black text-xl text-slate-800">Feature Flags (Kill-Switch)</h3>
+                                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Instant
+                                            Enable/Disable</p>
+                                    </div>
+                                </div>
+                                <div id="featureFlagsContainer" class="space-y-3">
+                                    <!-- Injected dynamically from App_Config -->
+                                </div>
+                            </div>
+
+                            <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                                <div class="flex items-center mb-6">
+                                    <div
+                                        class="w-14 h-14 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl mr-5 shadow-sm">
+                                        <i class="fa-solid fa-network-wired"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-black text-xl text-slate-800">Remote Assistance</h3>
+                                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Quick
+                                            Launch Links</p>
+                                    </div>
+                                </div>
+                                <div class="space-y-4">
+                                    <a href="https://anydesk.com/" target="_blank"
+                                        class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all shadow-sm">
+                                        <span class="text-sm font-bold text-slate-700">AnyDesk Web Client</span><i
+                                            class="fa-solid fa-arrow-up-right-from-square text-slate-400"></i>
+                                    </a>
+                                    <a href="https://ultraviewer.net/" target="_blank"
+                                        class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all shadow-sm">
+                                        <span class="text-sm font-bold text-slate-700">UltraViewer Portal</span><i
+                                            class="fa-solid fa-arrow-up-right-from-square text-slate-400"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZERO-TOUCH DYNAMIC MODULES INJECTION ZONE -->
+            <div class="mt-12 col-span-full">
+                <div id="dynamicModuleNav" class="mb-4"></div>
+                <div id="universalTableContainer"></div>
+            </div>
+
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>

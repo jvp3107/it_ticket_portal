@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Hub | Spread Technical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body class="flex flex-col min-h-screen font-sans antialiased">
+
+    <!-- TICKET MODAL -->
+    <div id="ticketModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div id="ticketModal"
+            class="glass-panel w-full max-w-5xl max-h-[90vh] rounded-[32px] flex flex-col overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center p-6 border-b border-slate-200 glass-surface bg-white/80">
+                <div class="w-full">
+                    <h3 class="font-extrabold text-2xl text-blue-600 mb-1" id="modalRequesterName">User Name</h3>
+                    <div class="flex items-center gap-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <span id="modalTicketId"
+                            class="text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">INC-000000</span>
+                        &bull; <span id="modalTicketDate">Date</span>
+                    </div>
+                </div>
+                <button onclick="closeTicketModal()"
+                    class="w-10 h-10 rounded-full glass-surface hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-grow overflow-hidden flex flex-col lg:flex-row bg-white">
+                <div class="w-full lg:w-3/5 p-6 overflow-y-auto border-r border-slate-200" id="modalTicketDetails">
+                    <div class="mb-8">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Ticket Lifecycle
+                        </p>
+                        <div class="flex items-center" id="modalPipeline"></div>
+                    </div>
+                    <div class="mb-6 border-b border-slate-200 pb-6">
+                        <h4 class="text-sm font-bold text-slate-800 mb-3">Subject: <span
+                                class="font-normal text-slate-600" id="modalSubject">Subject</span></h4>
+                        <div class="flex flex-wrap gap-2 mb-4" id="modalBadges"></div>
+                        <div class="glass-surface p-5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <p class="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed" id="modalDescription">
+                            </p>
+                        </div>
+                        <div id="modalAttachmentContainer" class="mt-4"></div>
+                        <div id="modalRemoteContainer"></div>
+                    </div>
+                    <div
+                        class="grid grid-cols-2 gap-4 glass-surface p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Requester
+                                Contact</p>
+                            <p class="text-xs text-slate-700 font-medium" id="modalRequesterContact"></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">IT Assignment
+                            </p>
+                            <p class="text-xs font-bold text-emerald-600" id="modalAssignment"></p>
+                            <p class="text-[10px] text-slate-500" id="modalAssignDate"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="w-full lg:w-2/5 flex flex-col bg-slate-50 h-[50vh] lg:h-auto relative">
+                    <div
+                        class="p-4 border-b border-slate-200 flex justify-between items-center bg-white absolute top-0 w-full z-10 shadow-sm">
+                        <h4 class="font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center">
+                            <i class="fa-brands fa-whatsapp mr-2 text-emerald-500 text-lg"></i> Live Chat
+                        </h4>
+                    </div>
+                    <div id="modalChatHistory"
+                        class="flex-grow overflow-y-auto p-4 pt-16 flex flex-col scroll-smooth chat-bg pb-20"></div>
+                    <div
+                        class="p-4 glass-surface border-t border-slate-200 bg-white absolute bottom-0 w-full z-10 shadow-lg">
+                        <div class="flex gap-2 relative">
+                            <input type="hidden" id="modalActiveTicketId">
+                            <input type="text" id="modalChatInput"
+                                onkeypress="if(event.key === 'Enter') postModalChatMessage()"
+                                class="flex-grow px-5 py-3 text-sm border border-slate-300 bg-white rounded-full outline-none focus:border-blue-500 text-slate-800 transition-colors shadow-inner"
+                                placeholder="Type a message...">
+                            <button onclick="postModalChatMessage()" id="modalChatSendBtn"
+                                class="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center hover:bg-blue-500 transition-colors shadow-md active:scale-95 flex-shrink-0">
+                                <i class="fa-solid fa-paper-plane text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL HEADER -->
+    <header class="glass-header sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-md border border-blue-500/50">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div class="border-l-2 border-slate-300 pl-4">
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">SPREAD TECHNICAL</h1>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">IT Service Management</p>
+                </div>
+            </div>
+            <button onclick="logoutGlobal()" id="globalLogoutBtn"
+                class="bg-rose-50 border border-rose-200 text-rose-600 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-rose-100 transition-all flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        <div id="clientDashboardView" class="max-w-6xl mx-auto block">
+
+            <!-- Welcome Banner -->
+            <div
+                class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 glass-panel p-6 rounded-[24px] bg-white/90">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800">My Support Hub</h2>
+                    <p class="text-sm font-bold text-slate-500 mt-1" id="clientWelcomeText">Welcome back.</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="goTo('kb.html')"
+                        class="glass-surface bg-white text-slate-700 font-bold px-6 py-3.5 rounded-full border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all duration-300">
+                        <i class="fa-solid fa-book mr-2 text-blue-500"></i>Diagnostics
+                    </button>
+                    <button onclick="toggleNewTicketForm()"
+                        class="bg-blue-600 border border-blue-500 text-white font-bold px-6 py-3.5 rounded-full shadow-md hover:shadow-lg hover:-translate-y-1 active:scale-95 transition-all duration-300">
+                        <i class="fa-solid fa-plus mr-2"></i>New Request
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manager Approvals Portal -->
+            <div id="approverSection" class="hidden mb-8">
+                <div class="glass-panel border-amber-300 bg-amber-50 p-8 shadow-md relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 opacity-10 text-8xl text-amber-500"><i
+                            class="fa-solid fa-clipboard-check"></i></div>
+                    <h3 class="font-black text-2xl text-amber-700 mb-2 relative z-10">
+                        <i class="fa-solid fa-clipboard-check mr-2"></i> Manager Approvals
+                    </h3>
+                    <p class="text-sm text-amber-600 font-medium mb-8 relative z-10">Review pending requests generated
+                        by your organization.</p>
+                    <div id="approverTicketsContainer"
+                        class="space-y-4 max-h-[400px] overflow-y-auto pr-2 relative z-10"></div>
+                </div>
+            </div>
+
+            <!-- New Ticket Form -->
+            <div id="newTicketFormContainer" class="hidden mb-10 animate-slide-up">
+                <form id="ticketForm" onsubmit="submitTicket(event)"
+                    class="glass-panel p-10 rounded-[40px] shadow-lg bg-white/95">
+
+                    <h3 class="font-black text-2xl mb-8 text-slate-800 border-b border-slate-200 pb-4">
+                        <i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i> Draft Service Request
+                    </h3>
+
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Requester Details</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-user-tag input-icon"></i>
+                            <select id="ticketFor" class="itsm-input appearance-none cursor-pointer pl-10"
+                                onchange="handleTicketForChange()">
+                                <option value="Self" selected>Self</option>
+                                <option value="Someone Else">Someone Else (Same Organization)</option>
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Requesting For</span>
+                        </div>
+                        <div class="itsm-input-wrapper hidden" id="peerWrapper">
+                            <i class="fa-solid fa-users input-icon"></i>
+                            <select id="ticketForPeer" class="itsm-input appearance-none cursor-pointer pl-10"
+                                disabled></select>
+                            <span class="itsm-label" style="left:44px;">Select User *</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-user input-icon"></i>
+                            <input type="text" id="ticketName" required
+                                class="itsm-input bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed pl-10"
+                                placeholder=" " readonly>
+                            <span class="itsm-label" style="left:44px;">Full Name *</span>
+                        </div>
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-envelope input-icon"></i>
+                            <input type="email" id="ticketEmail" required
+                                class="itsm-input bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed pl-10"
+                                placeholder=" " readonly>
+                            <span class="itsm-label" style="left:44px;">Corporate Email</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-building input-icon"></i>
+                            <input type="text" id="ticketCompany" required
+                                class="itsm-input bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed pl-10"
+                                placeholder=" " readonly>
+                            <span class="itsm-label" style="left:44px;">Company</span>
+                        </div>
+                        <div class="flex gap-3 w-full">
+                            <div class="itsm-input-wrapper w-[45%] sm:w-[35%]">
+                                <i class="fa-solid fa-globe input-icon"></i>
+                                <select id="countryCode" class="itsm-input appearance-none cursor-pointer pl-10">
+                                    <option value="+971" selected>🇦🇪 +971</option>
+                                    <option value="+91">🇮🇳 +91</option>
+                                    <option value="+1">🇺🇸 +1</option>
+                                    <option value="+44">🇬🇧 +44</option>
+                                </select>
+                                <span class="itsm-label" style="left:44px;">Code</span>
+                            </div>
+                            <div class="itsm-input-wrapper w-[55%] sm:w-[65%]">
+                                <input type="tel" id="phoneNumber" class="itsm-input pl-10" placeholder=" ">
+                                <span id="phoneLabel" class="itsm-label" style="left:44px;">Contact Number</span>
+                            </div>
+                        </div>
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-address-book input-icon"></i>
+                            <select id="contactMethod" class="itsm-input appearance-none cursor-pointer pl-10">
+                                <!-- Dynamically Populated by app.js -->
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Preferred Contact</span>
+                        </div>
+                    </div>
+
+                    <div class="itsm-input-wrapper mb-5">
+                        <i class="fa-solid fa-at input-icon"></i>
+                        <input type="text" id="ticketCC" class="itsm-input pl-10" placeholder=" ">
+                        <span class="itsm-label" style="left:44px;">CC Email (Optional - Comma separated)</span>
+                    </div>
+
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 mt-10">Request
+                        Classification</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-code-branch input-icon"></i>
+                            <select id="requestType" class="itsm-input appearance-none cursor-pointer pl-10"
+                                onchange="handleRequestTypeChange()">
+                                <!-- Dynamically Populated by app.js -->
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Request Type</span>
+                        </div>
+                        <div class="itsm-input-wrapper">
+                            <i class="fa-solid fa-laptop-code input-icon"></i>
+                            <select id="deviceType" required class="itsm-input appearance-none cursor-pointer pl-10"
+                                onchange="updateFormLogic()">
+                                <!-- Dynamically Populated by app.js -->
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Category *</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                        <div class="itsm-input-wrapper" id="priorityWrapper">
+                            <i class="fa-solid fa-triangle-exclamation input-icon"></i>
+                            <select id="priority" class="itsm-input appearance-none cursor-pointer pl-10">
+                                <!-- Dynamically Populated by app.js -->
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Impact Level</span>
+                        </div>
+                        <div class="itsm-input-wrapper" id="assetTagWrapper">
+                            <i class="fa-solid fa-barcode input-icon"></i>
+                            <input type="text" id="assetTag" class="itsm-input pl-10" placeholder=" ">
+                            <span class="itsm-label" style="left:44px;">Asset Tag / Hostname (Optional)</span>
+                        </div>
+                    </div>
+
+                    <div id="newJoineeFields"
+                        class="hidden grid-cols-2 gap-5 mb-5 border-l-4 border-blue-500 pl-5 bg-slate-50 border border-slate-200 p-5 rounded-r-2xl">
+                        <div class="itsm-input-wrapper mb-0"><i class="fa-solid fa-user-check input-icon"></i><input
+                                type="text" id="joineeName" class="itsm-input pl-10" placeholder=" " disabled><span
+                                class="itsm-label" style="left:44px;">New Joinee Name *</span></div>
+                        <div class="itsm-input-wrapper mb-0"><i class="fa-solid fa-location-dot input-icon"></i><input
+                                type="text" id="joineeLocation" class="itsm-input pl-10" placeholder=" " disabled><span
+                                class="itsm-label" style="left:44px;">Desk Location / Branch *</span></div>
+                    </div>
+
+                    <div id="newPeripheralFields"
+                        class="hidden mb-5 border-l-4 border-blue-500 pl-5 bg-slate-50 border border-slate-200 p-5 rounded-r-2xl">
+                        <div class="itsm-input-wrapper mb-0">
+                            <i class="fa-solid fa-mouse input-icon"></i>
+                            <select id="peripheralList" class="itsm-input appearance-none cursor-pointer pl-10"
+                                disabled>
+                                <option value="" disabled selected></option>
+                                <option value="Wireless Mouse">Wireless Mouse</option>
+                                <option value="Wired Mouse">Wired Mouse</option>
+                                <option value="Wireless Keyboard">Wireless Keyboard</option>
+                                <option value="Wired Keyboard">Wired Keyboard</option>
+                                <option value="Keyboard & Mouse Combo">Keyboard & Mouse Combo</option>
+                                <option value="Monitor (24 inch)">Monitor (24 inch)</option>
+                                <option value="Monitor (27 inch)">Monitor (27 inch)</option>
+                                <option value="Laptop Docking Station">Laptop Docking Station</option>
+                                <option value="Headset / Headphones">Headset / Headphones</option>
+                                <option value="Webcam">Webcam</option>
+                                <option value="Laptop Stand / Riser">Laptop Stand / Riser</option>
+                                <option value="HDMI / DisplayPort Cable">HDMI / DisplayPort Cable</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <span class="itsm-label" style="left:44px;">Select Required Hardware *</span>
+                        </div>
+                    </div>
+
+                    <div id="remoteSupportFields"
+                        class="hidden mb-6 border-l-4 border-rose-400 pl-5 bg-rose-50 border-rose-200 border p-5 rounded-r-2xl">
+                        <h4 class="text-xs font-black text-rose-600 uppercase tracking-wider mb-2"><i
+                                class="fa-solid fa-desktop mr-2"></i>Remote Support Verification</h4>
+                        <p class="text-xs text-rose-700 mb-5 font-medium">Action Required: For Low/Medium endpoint
+                            incidents, you MUST enter your remote connection credentials below OR attach a screenshot of
+                            the issue.</p>
+                        <div class="itsm-input-wrapper mb-5">
+                            <i class="fa-solid fa-network-wired input-icon text-rose-500"></i>
+                            <select id="remoteApp"
+                                class="itsm-input appearance-none cursor-pointer text-slate-800 pl-10 !border-rose-300 !bg-white"
+                                onchange="handleRemoteAppChange()" disabled>
+                                <option value="UltraViewer" selected>UltraViewer</option>
+                                <option value="AnyDesk">AnyDesk</option>
+                                <option value="TeamViewer">TeamViewer</option>
+                            </select>
+                            <span class="itsm-label text-rose-500" style="left:44px;">Remote Application</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="itsm-input-wrapper mb-0"><i
+                                    class="fa-solid fa-id-badge input-icon text-rose-500"></i><input type="text"
+                                    id="remoteId" class="itsm-input pl-10 !border-rose-300 text-slate-800 !bg-white"
+                                    placeholder=" " disabled><span class="itsm-label text-rose-500"
+                                    style="left:44px;">Remote ID / Address</span></div>
+                            <div class="itsm-input-wrapper mb-0"><i
+                                    class="fa-solid fa-key input-icon text-rose-500"></i><input type="text"
+                                    id="remotePass" class="itsm-input pl-10 !border-rose-300 text-slate-800 !bg-white"
+                                    placeholder=" " disabled><span id="remotePassLabel" class="itsm-label text-rose-500"
+                                    style="left:44px;">Remote Password</span></div>
+                        </div>
+                    </div>
+
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 mt-10">Diagnostic Details
+                    </p>
+                    <div class="itsm-input-wrapper mb-5"><input type="text" id="ticketSubject" required
+                            class="itsm-input font-bold pl-4" placeholder=" "><span class="itsm-label"
+                            style="left:16px;">Short Summary *</span></div>
+                    <div class="itsm-input-wrapper mb-5"><textarea id="message" rows="4" required
+                            class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea><span
+                            class="itsm-label" style="left:16px;">Detailed issue description *</span></div>
+
+                    <div
+                        class="mb-8 p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700"><i
+                                    class="fa-solid fa-paperclip mr-2 text-blue-500"></i>Upload Diagnostic
+                                Evidence</label>
+                            <p class="text-xs text-slate-500 mt-1 font-medium">Accepts screenshots, PDFs, or log files
+                                (Max 5MB). Automatically saves to Google Drive.</p>
+                        </div>
+                        <input type="file" id="attachmentFile" accept="image/*,.pdf,.log"
+                            class="text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-5 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-white file:border-slate-200 file:border file:text-blue-600 file:shadow-sm hover:file:bg-slate-100 cursor-pointer transition-colors w-full sm:w-auto" />
+                    </div>
+
+                    <div
+                        class="flex flex-col sm:flex-row justify-end gap-4 items-center border-t border-slate-200 pt-8">
+                        <button type="button" onclick="toggleNewTicketForm()"
+                            class="text-slate-600 font-bold px-8 py-3.5 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full transition w-full sm:w-auto">Cancel</button>
+                        <button type="submit" id="submitBtn"
+                            class="bg-blue-600 border border-blue-500 text-white font-bold px-10 py-3.5 rounded-full shadow-md hover:shadow-lg hover:bg-blue-500 transition w-full sm:w-auto"><i
+                                class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Client Ticket View Tracker -->
+            <div class="glass-panel rounded-[32px] overflow-hidden shadow-md mt-8 bg-white">
+                <div
+                    class="p-6 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center bg-slate-50 gap-4">
+                    <div
+                        class="flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded-full w-full md:w-auto overflow-x-auto shadow-sm">
+                        <button onclick="switchClientTicketTab('active')" id="clientTabBtn-active"
+                            class="px-6 py-2.5 rounded-full text-sm font-bold bg-blue-600 text-white shadow-sm transition whitespace-nowrap"><i
+                                class="fa-solid fa-list-check mr-2"></i>Active Requests</button>
+                        <button onclick="switchClientTicketTab('closed')" id="clientTabBtn-closed"
+                            class="px-6 py-2.5 rounded-full text-sm font-bold text-slate-500 hover:text-slate-800 transition whitespace-nowrap"><i
+                                class="fa-solid fa-check-double mr-2"></i>Closed Tickets</button>
+                    </div>
+                    <button onclick="fetchClientTickets()"
+                        class="text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-6 py-2.5 rounded-full shadow-sm transition-all active:scale-95 whitespace-nowrap"><i
+                            class="fa-solid fa-rotate mr-2"></i>Refresh</button>
+                </div>
+                <div id="clientActiveTicketsContainer" class="p-6 grid grid-cols-1 gap-6 bg-slate-50/50"></div>
+                <div id="clientClosedTicketsContainer" class="hidden p-6 grid grid-cols-1 gap-6 bg-slate-50/50"></div>
+            </div>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+
+</html>

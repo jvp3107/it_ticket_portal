@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Admin Login | Spread Technical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="flex flex-col min-h-screen font-sans antialiased">
+    <!-- Paste Global Header here -->
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        <div class="max-w-sm mx-auto mt-12">
+            <div class="glass-panel rounded-[32px] p-10 text-center hover:shadow-xl transition-all duration-300 bg-white/90">
+                <div class="w-20 h-20 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-6 border border-slate-200"><i class="fa-solid fa-shield-halved"></i></div>
+                <h2 class="text-2xl font-black text-slate-800 mb-2">IT Authentication</h2>
+                <p class="text-sm text-slate-500 font-medium mb-8">Secure access for technical personnel.</p>
+                <form onsubmit="handleITLogin(event)" class="text-left">
+                    <div class="itsm-input-wrapper"><i class="fa-solid fa-user-shield input-icon"></i><input type="email" id="itUsername" required class="itsm-input pl-10" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:44px;">Admin Email</span></div>
+                    <div class="itsm-input-wrapper"><i class="fa-solid fa-key input-icon"></i><input type="password" id="itPassword" required class="itsm-input pl-10" placeholder=" " autocomplete="new-password"><span class="itsm-label" style="left:44px;">Passkey</span></div>
+                    <div class="flex flex-col gap-3 mt-6">
+                        <button type="submit" class="w-full bg-blue-600 text-white font-bold text-sm py-4 rounded-full shadow-md hover:bg-blue-500 active:scale-95 transition-all border border-blue-500/50">Login Admin</button>
+                        <button type="button" onclick="goTo('index.html')" class="w-full bg-slate-50 text-slate-600 border border-slate-200 font-bold py-3 rounded-full hover:bg-slate-100 active:scale-95 transition-all shadow-sm text-sm">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+</html>

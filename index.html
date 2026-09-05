@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spread Technical | Portal Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="flex flex-col min-h-screen font-sans antialiased">
+    <header class="glass-header sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-md border border-blue-500/50"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="border-l-2 border-slate-300 pl-4"><h1 class="text-xl font-black text-slate-800 tracking-tight">SPREAD TECHNICAL</h1><p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">IT Service Management</p></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        <div class="max-w-4xl mx-auto mt-4">
+            <div class="glass-panel rounded-[40px] p-14 text-center transition-all bg-white/80">
+                <div class="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-8 border border-blue-100"><i class="fa-solid fa-headset"></i></div>
+                <h2 class="text-4xl font-black text-slate-800 mb-4">Support Portal</h2>
+                <p class="text-slate-600 max-w-xl mx-auto mb-10 text-base leading-relaxed font-medium">Access our service catalog or raise technical requests directly with the IT team.</p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="goTo('client-login.html')" class="bg-blue-600 text-white font-bold text-sm px-8 py-4 rounded-full shadow-md hover:-translate-y-1 hover:bg-blue-500 transition-all uppercase tracking-wide"><i class="fa-solid fa-ticket-simple mr-2"></i> Request Support</button>
+                    <button onclick="goTo('admin-login.html')" class="glass-surface bg-white text-slate-700 font-bold text-sm px-8 py-4 rounded-full shadow-sm hover:bg-slate-50 hover:-translate-y-1 transition-all uppercase tracking-wide border border-slate-200"><i class="fa-solid fa-shield-halved mr-2"></i> IT Admin Login</button>
+                </div>
+            </div>
+            <div class="mt-16 text-center">
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-4">Troubleshoot your issue before requesting support</p>
+                <button onclick="goTo('kb.html')" class="bg-emerald-600 text-white font-bold text-sm px-8 py-4 rounded-full shadow-md hover:shadow-lg hover:-translate-y-1 hover:bg-emerald-500 transition-all uppercase tracking-wide mx-auto"><i class="fa-solid fa-stethoscope mr-2"></i> Self Diagnostics</button>
+            </div>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+</html>

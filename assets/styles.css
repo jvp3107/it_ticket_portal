@@ -1,0 +1,356 @@
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Material Design 3 Elevation Cards & Surfaces */
+.glass-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.glass-header {
+    background: rgba(255, 255, 255, 0.98);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.glass-surface {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+}
+
+/* Fast & Lightweight Scrollbars */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.view-section {
+    display: none;
+    animation: fadeIn 0.15s ease-out;
+}
+
+.view-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Material Design Floating Input Fields */
+.itsm-input-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.itsm-input {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 22px 16px 8px 44px;
+    font-size: 0.95rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    color: #0f172a;
+}
+
+.itsm-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.itsm-label {
+    position: absolute;
+    left: 44px;
+    top: 15px;
+    font-size: 0.9rem;
+    color: #64748b;
+    pointer-events: none;
+    transition: 0.15s ease;
+    font-weight: 500;
+}
+
+.itsm-input:focus~.itsm-label,
+.itsm-input.has-val~.itsm-label,
+.itsm-input:not(:placeholder-shown)~.itsm-label {
+    top: 6px;
+    font-size: 0.65rem;
+    color: #2563eb;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+}
+
+/* Material Chat Interface */
+.chat-bg {
+    background-color: #f1f5f9;
+}
+
+.chat-bubble-container {
+    display: flex;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.chat-bubble-container.me {
+    justify-content: flex-end;
+}
+
+.chat-bubble-container.them {
+    justify-content: flex-start;
+}
+
+.chat-bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-bubble.me {
+    background-color: #2563eb;
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.them {
+    background-color: #ffffff;
+    color: #0f172a;
+    border-bottom-left-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.chat-sender {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+}
+
+.chat-bubble.me .chat-sender {
+    color: #bfdbfe;
+}
+
+.chat-message-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+.chat-meta {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    text-align: right;
+    margin-top: 4px;
+    display: block;
+}
+
+/* Material Pill Navigation Tabs */
+.admin-nav-container {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    padding: 5px;
+    display: inline-flex;
+    gap: 6px;
+}
+
+.ent-tab-btn {
+    padding: 9px 22px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.ent-tab-active {
+    background-color: #2563eb;
+    color: white;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.ent-tab-inactive {
+    background-color: transparent;
+    color: #64748b;
+}
+
+.ent-tab-inactive:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Sticky Table Header */
+.table-header-custom th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f8fafc;
+    box-shadow: inset 0 -2px 0 0 #e2e8f0;
+    cursor: pointer;
+    user-select: none;
+    color: #475569;
+}
+
+.table-header-custom th:hover {
+    background-color: #f1f5f9;
+}
+
+.sort-icon {
+    opacity: 0.4;
+    margin-left: 4px;
+    font-size: 0.75rem;
+    transition: 0.15s;
+    color: #64748b;
+}
+
+.sort-active {
+    opacity: 1;
+    color: #2563eb;
+}
+
+/* Lifecycle Pipeline */
+.pipeline-node {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 2;
+    transition: all 0.2s;
+}
+
+.pipeline-line {
+    flex-grow: 1;
+    height: 2px;
+    background: #cbd5e1;
+    margin: 0 -4px;
+    z-index: 1;
+}
+
+.node-active {
+    background: #2563eb;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.node-past {
+    background: #2563eb;
+    color: white;
+}
+
+.line-active {
+    background: #2563eb;
+}
+
+.node-pending {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+}
+
+/* Material Toggle Switch UI */
+.itsm-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.itsm-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.itsm-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: .2s;
+    border-radius: 34px;
+}
+
+.itsm-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+input:checked+.itsm-slider {
+    background-color: #2563eb;
+}
+
+input:checked+.itsm-slider:before {
+    transform: translateX(20px);
+}
