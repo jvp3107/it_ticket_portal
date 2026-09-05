@@ -144,6 +144,7 @@
 
             <!-- TAB: Global Queue View -->
             <div id="noc-allView" class="animate-fade-in">
+                
                 <!-- KPI Cards (6 Tiles) -->
                 <div class="grid grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
                     <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-blue-50 border-blue-100 border cursor-pointer" onclick="setQuickFilter('All')">
@@ -261,15 +262,9 @@
                                 <button type="button" onclick="getLocation()" class="absolute right-3 top-4 text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-lg transition" title="Get GPS Coordinates"><i class="fa-solid fa-location-crosshairs"></i></button>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0">
-                                <div class="itsm-input-wrapper mb-0">
-                                    <input type="datetime-local" id="visitInTime" required class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">Time In *</span>
-                                </div>
-                                <div class="itsm-input-wrapper mb-0">
-                                    <input type="datetime-local" id="visitOutTime" class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">Time Out</span>
-                                </div>
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <input type="datetime-local" id="visitDate" required class="itsm-input pl-4" placeholder=" ">
+                                <span class="itsm-label" style="left:16px;">Schedule Date / Time *</span>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
@@ -288,15 +283,29 @@
                                 <span class="itsm-label" style="left:16px;">Device Details / Purpose</span>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
-                                <div class="itsm-input-wrapper mb-0">
-                                    <input type="text" id="visitPhotoUrl" class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">Photo URL</span>
-                                </div>
-                                <div class="itsm-input-wrapper mb-0">
-                                    <input type="text" id="visitDocuments" class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">Documents (Links)</span>
-                                </div>
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="visitTicketRef" multiple class="itsm-input appearance-none pl-4 cursor-pointer text-blue-700 font-bold bg-blue-50/50 overflow-y-auto" onchange="autoFillPurposeFromTicket()" style="min-height: 100px; padding-top: 25px; padding-bottom: 10px;">
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Linked Tickets (Hold Ctrl to select multiple)</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <input type="text" id="visitPurpose" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Purpose *</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="visitStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="Scheduled" selected>Scheduled</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Status</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <textarea id="visitNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea>
+                                <span class="itsm-label" style="left:16px;">Outcome / Notes</span>
                             </div>
                             
                             <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
@@ -507,7 +516,7 @@
                     </div>
                 </div>
 
-                <!-- Sub-tab: Platform Settings & Feature Flags -->
+                <!-- Sub-tab: Platform Settings & Feature Flags (Script Boxes Removed) -->
                 <div id="admTab-apps" class="hidden animate-fade-in max-w-5xl mx-auto">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         
@@ -530,7 +539,7 @@
                             <button onclick="savePlatformSettings()" class="w-full bg-blue-600 text-white py-4 rounded-full text-sm font-bold shadow-md hover:bg-blue-500 transition-colors active:scale-95">Save Settings to Database</button>
                         </div>
 
-                        <!-- Feature Flags Toggle Column -->
+                        <!-- Feature Flags Toggle Column (Scrollable Container Added) -->
                         <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white self-start">
                             <div class="flex items-center mb-6">
                                 <div class="w-14 h-14 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl mr-5 shadow-sm"><i class="fa-solid fa-toggle-on"></i></div>
