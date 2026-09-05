@@ -1,6 +1,6 @@
 /**
  * GLOBAL CONFIGURATION & ROUTING ENGINE
- * Spread Technical ITSM (Material UI Optimized)
+ * Spread Technical ITSM (Strict Android DB Schema Compliance)
  */
 const DB_CONFIG = {
     ticketApiUrl: "https://script.google.com/macros/s/AKfycbzUtwju4tELvUTYBlVCWYTFp5LZ7cCkNbhWFzy081HHhABPPLzFUS4xjjBvhIO699wS/exec",
@@ -265,9 +265,9 @@ async function toggleFeatureFlag(flagName, isChecked) {
     const newStatus = isChecked ? 'enabled' : 'disabled';
     const dbKey = `Feature_${flagName}`;
     try {
-        await apiPost({ 
-            action: 'db_upsert', target_sheet: 'Settings', primary_key: 'Key', 
-            Key: dbKey, Value: newStatus 
+        await apiPost({
+            action: 'db_upsert', target_sheet: 'Settings', primary_key: 'Key',
+            Key: dbKey, Value: newStatus
         });
         await fetchAppConfig();
     } catch (e) { alert("Failed to update feature flag."); }
@@ -830,7 +830,7 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// FIELD VISITS ENGINE (WITH DURATION IN CARD)
+// FIELD VISITS ENGINE (STRICT SCHEMA MATCH)
 // ==========================================
 function populateVisitCompanies() {
     const compSelect = document.getElementById('visitCompany');
@@ -848,63 +848,64 @@ async function fetchVisits() {
     } catch (e) { }
 }
 
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                document.getElementById('visitLat').value = position.coords.latitude;
+                document.getElementById('visitLng').value = position.coords.longitude;
+                alert("GPS Coordinates captured successfully!");
+            },
+            (err) => {
+                console.warn(err);
+                alert("Could not fetch location. Please ensure location services are enabled on this device.");
+            }
+        );
+    } else {
+        alert("Geolocation is not supported by this browser.");
+    }
+}
+
 function renderVisits() {
     const container = document.getElementById('visitLogsContainer'); if (!container) return;
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
     let sorted = [...globalVisits].sort((a, b) => {
-        let dA = a['In Time'] || a['in time'] || a.in_time || a.visit_date || a.date || a['out time'] || a.out_time || 0;
-        let dB = b['In Time'] || b['in time'] || b.in_time || b.visit_date || b.date || b['out time'] || b.out_time || 0;
+        let dA = a.time_in || a.date || a.time_out || 0;
+        let dB = b.time_in || b.date || b.time_out || 0;
         return new Date(dB) - new Date(dA);
     });
 
     let html = '';
     sorted.forEach(v => {
-        let statColor = v.status === 'Completed' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : v.status === 'Cancelled' ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-amber-700 bg-amber-50 border-amber-200';
-        let mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.location)}`;
+        let isCompleted = (v.time_out && v.time_out.trim() !== "");
+        let statColor = isCompleted ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+        let statusText = isCompleted ? 'Completed' : 'Ongoing';
+        
+        let mapLink = v.latitude && v.longitude 
+            ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        let inRaw = v['In Time'] || v['in time'] || v.in_time || v.visit_date || v.date || v['out time'] || v.out_time;
-        let outRaw = v['Out Time'] || v['out time'] || v.out_time;
+        const formatDate = (dateStr) => {
+            if (!dateStr) return null;
+            let d = new Date(dateStr);
+            return isNaN(d) ? dateStr : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+        };
 
-        let dIn = inRaw ? new Date(inRaw) : null;
-        let dOut = outRaw ? new Date(outRaw) : null;
-
-        let inDisplay = "No Entry Time";
-        if (dIn && !isNaN(dIn)) { 
-            inDisplay = dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); 
-        }
-
-        let exitDisplay = "Pending";
-        if (dOut && !isNaN(dOut)) { 
-            exitDisplay = dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); 
-        }
-
-        let durationDisplay = '<span class="text-slate-400 font-medium">Ongoing</span>';
-        if (dIn && dOut && !isNaN(dIn) && !isNaN(dOut)) {
-            let diffMs = dOut - dIn;
-            if (diffMs >= 0) {
-                let hrs = Math.floor(diffMs / (1000 * 60 * 60));
-                let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${hrs}h ${mins}m</span>`;
-            } else { 
-                durationDisplay = '<span class="text-rose-500 font-bold">Time Error</span>'; 
-            }
-        }
-
-        let ticketBadge = '';
-        if (v.ticket_ref) {
-            const tArr = String(v.ticket_ref).split(',').map(t => t.trim()).filter(Boolean);
-            tArr.forEach(tRef => { ticketBadge += `<span class="px-2 py-0.5 rounded text-[9px] font-bold border shadow-sm text-blue-700 bg-blue-50 border-blue-200 mr-1"><i class="fa-solid fa-ticket mr-1"></i>${escapeHTML(tRef)}</span>`; });
-        }
+        let scheduleDisplay = formatDate(v.date) || "No Schedule Date";
+        let inDisplay = formatDate(v.time_in) || "Not Started";
+        let exitDisplay = formatDate(v.time_out) || "Pending";
+        
+        let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
             <div class="flex justify-between items-start">
                 <h4 class="font-black text-sm text-slate-800 flex items-center flex-wrap gap-2">
                     ${escapeHTML(v.company)} 
-                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${escapeHTML(v.status)}</span> 
-                    ${ticketBadge}
+                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${statusText}</span> 
                 </h4>
+                <span class="text-[10px] text-slate-500 font-bold whitespace-nowrap">${scheduleDisplay}</span>
             </div>
             
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-100 rounded-xl p-3 shadow-inner">
@@ -923,18 +924,13 @@ function renderVisits() {
             </div>
 
             <div class="flex flex-col gap-1">
-                <p class="text-xs text-blue-600 font-bold"><i class="fa-solid fa-user-tie mr-1 w-4 text-center"></i> ${escapeHTML(v.it_staff)}</p>
-                <p class="text-xs text-slate-600 font-medium"><i class="fa-solid fa-bullseye mr-1 w-4 text-center text-slate-400"></i> ${escapeHTML(v.purpose)}</p>
-                ${v.notes ? `<p class="text-[10px] text-slate-500 italic mt-1 bg-white p-2 rounded border border-slate-100"><strong class="font-bold not-italic text-slate-600">Notes:</strong> ${escapeHTML(v.notes)}</p>` : ''}
+                <p class="text-xs text-slate-600 font-medium"><i class="fa-solid fa-bullseye mr-1 w-4 text-center text-slate-400"></i> ${escapeHTML(v.device_details || v.purpose || "General Support")}</p>
             </div>
 
             <div class="flex items-center justify-between mt-1 pt-3 border-t border-slate-100">
                 <a href="${mapLink}" target="_blank" class="text-[10px] font-bold text-slate-500 hover:text-blue-600 transition truncate pr-4">
-                    <i class="fa-solid fa-map-location-dot mr-1 text-blue-500"></i> ${escapeHTML(v.location)}
+                    <i class="fa-solid fa-map-location-dot mr-1 text-blue-500"></i> ${escapeHTML(v.address || "Open Map")}
                 </a>
-                <button onclick="deleteVisit('${v.visit_id}')" class="text-rose-400 hover:text-rose-600 transition text-xs flex-shrink-0" title="Delete Log">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
             </div>
         </div>`;
     });
@@ -945,29 +941,47 @@ async function saveVisitLog(e) {
     e.preventDefault(); const btn = document.getElementById('btnSaveVisit'); btn.innerHTML = "Saving..."; btn.disabled = true;
     let vId = document.getElementById('visitId').value; if (!vId) vId = "VISIT-" + Date.now();
 
-    const ticketSelect = document.getElementById('visitTicketRef');
-    const selectedTickets = Array.from(ticketSelect.selectedOptions).map(opt => opt.value).filter(val => val !== "").join(', ');
-
     const payload = {
-        action: 'db_upsert', target_sheet: 'Visits', primary_key: 'visit_id',
-        visit_id: vId, it_staff: IT_NAME, company: document.getElementById('visitCompany').value,
-        location: document.getElementById('visitLocation').value.trim(),
-        'In Time': document.getElementById('visitInTime').value,
-        'Out Time': document.getElementById('visitDate').value,
-        ticket_ref: selectedTickets, purpose: document.getElementById('visitPurpose').value.trim(),
-        status: document.getElementById('visitStatus').value, notes: document.getElementById('visitNotes').value.trim()
+        action: 'db_upsert', target_sheet: 'Visits', primary_key: 'id',
+        id: vId,
+        company: document.getElementById('visitCompany').value,
+        technician: IT_NAME,
+        date: document.getElementById('visitDate').value,
+        time_in: "",
+        time_out: "",
+        duration: "",
+        device_details: document.getElementById('visitDeviceDetails').value.trim(),
+        photo_url: "",
+        documents: "",
+        address: document.getElementById('visitAddress').value.trim(),
+        latitude: document.getElementById('visitLat').value.trim(),
+        longitude: document.getElementById('visitLng').value.trim(),
+        client_phone: document.getElementById('visitClientPhone').value.trim(),
+        client_contact: document.getElementById('visitClientContact').value.trim(),
+        status: document.getElementById('visitStatus').value, 
+        notes: document.getElementById('visitNotes').value.trim()
     };
+
     try { await apiPost(payload); clearVisitForm(); fetchVisits(); } catch (e) { alert("Network error saving visit."); }
     btn.innerHTML = "Save Log"; btn.disabled = false;
 }
 
 function clearVisitForm() {
-    document.getElementById('visitId').value = ''; document.getElementById('visitCompany').value = ''; document.getElementById('visitLocation').value = ''; document.getElementById('visitInTime').value = ''; document.getElementById('visitDate').value = ''; document.getElementById('visitTicketRef').selectedIndex = -1; document.getElementById('visitPurpose').value = ''; document.getElementById('visitStatus').value = 'Scheduled'; document.getElementById('visitNotes').value = ''; document.querySelectorAll('#noc-visitsView .itsm-input').forEach(i => i.classList.remove('has-val'));
+    document.getElementById('visitId').value = ''; 
+    document.getElementById('visitLat').value = ''; 
+    document.getElementById('visitLng').value = ''; 
+    document.getElementById('visitCompany').value = ''; 
+    document.getElementById('visitAddress').value = ''; 
+    document.getElementById('visitDate').value = ''; 
+    document.getElementById('visitClientContact').value = ''; 
+    document.getElementById('visitClientPhone').value = ''; 
+    document.getElementById('visitDeviceDetails').value = ''; 
+    document.querySelectorAll('#noc-visitsView .itsm-input').forEach(i => i.classList.remove('has-val'));
 }
 
 async function deleteVisit(id) {
     if (!confirm("Delete this visit log permanently?")) return;
-    try { await apiPost({ action: 'db_delete', target_sheet: 'Visits', primary_key: 'visit_id', primary_value: id }); fetchVisits(); } catch (e) { alert("Error deleting log."); }
+    try { await apiPost({ action: 'db_delete', target_sheet: 'Visits', primary_key: 'id', primary_value: id }); fetchVisits(); } catch (e) { alert("Error deleting log."); }
 }
 
 function autoFillVisitDetails() {
@@ -975,46 +989,27 @@ function autoFillVisitDetails() {
     if (!compName) return;
 
     const comp = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === compName);
-    if (comp && comp.address) {
-        const locInput = document.getElementById('visitLocation'); locInput.value = comp.address; locInput.classList.add('has-val');
+    if (comp) {
+        const locInput = document.getElementById('visitAddress'); 
+        locInput.value = comp.address || ''; 
+        if(locInput.value) locInput.classList.add('has-val');
+
+        const contactInput = document.getElementById('visitClientContact');
+        contactInput.value = comp.it_contact || '';
+        if(contactInput.value) contactInput.classList.add('has-val');
+
+        const phoneInput = document.getElementById('visitClientPhone');
+        phoneInput.value = comp.phone || '';
+        if(phoneInput.value) phoneInput.classList.add('has-val');
     }
 
-    const inTimeInput = document.getElementById('visitInTime');
     const dateInput = document.getElementById('visitDate');
     const now = new Date(); const tzOffset = now.getTimezoneOffset() * 60000;
     
-    inTimeInput.value = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
-    inTimeInput.classList.add('has-val');
-
-    const defaultOutTime = new Date(now.getTime() + (60 * 60 * 1000));
-    dateInput.value = new Date(defaultOutTime.getTime() - tzOffset).toISOString().slice(0, 16);
+    dateInput.value = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
     dateInput.classList.add('has-val');
 
-    const ticketSelect = document.getElementById('visitTicketRef');
-    if (ticketSelect) {
-        const activeCompTickets = nocDashboardTickets.filter(t => t.company === compName && t.status !== 'Resolved');
-        let tOpts = `<option value="">General Visit (No linked ticket)</option>`;
-        activeCompTickets.forEach(t => { tOpts += `<option value="${t.id}" class="py-1 border-b border-blue-100">${t.id} - ${escapeHTML(t.subject)}</option>`; });
-        ticketSelect.innerHTML = tOpts; ticketSelect.selectedIndex = -1; ticketSelect.classList.remove('has-val');
-    }
-
-    document.getElementById('visitStatus').value = 'Scheduled';
-    document.getElementById('visitPurpose').focus();
-}
-
-function autoFillPurposeFromTicket() {
-    const ticketSelect = document.getElementById('visitTicketRef');
-    const selectedTickets = Array.from(ticketSelect.selectedOptions).map(opt => opt.value).filter(val => val !== "");
-    const pInput = document.getElementById('visitPurpose');
-
-    if (selectedTickets.length > 0) {
-        ticketSelect.classList.add('has-val');
-        const subjects = selectedTickets.map(tId => { const t = nocDashboardTickets.find(x => x.id === tId); return t ? t.subject : tId; });
-        pInput.value = `Addressing ${selectedTickets.join(', ')}: ${subjects.join(' | ')}`; pInput.classList.add('has-val');
-    } else {
-        ticketSelect.classList.remove('has-val');
-        pInput.value = ''; pInput.classList.remove('has-val');
-    }
+    document.getElementById('visitDeviceDetails').focus();
 }
 
 function quickScheduleVisit(companyName) {
