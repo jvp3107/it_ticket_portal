@@ -1,6 +1,6 @@
 /**
  * GLOBAL CONFIGURATION & ROUTING ENGINE
- * Spread Technical ITSM (Strict Android DB Schema Compliance)
+ * Spread Technical ITSM (Strict Android DB Schema Compliance + 1899 Date Fix)
  */
 const DB_CONFIG = {
     ticketApiUrl: "https://script.google.com/macros/s/AKfycbzUtwju4tELvUTYBlVCWYTFp5LZ7cCkNbhWFzy081HHhABPPLzFUS4xjjBvhIO699wS/exec",
@@ -77,20 +77,29 @@ function getSLAString(startDateStr, priority, status) {
     return `<span class="text-emerald-600 font-bold font-mono text-xs">${hrs}h ${mins}m left</span>`;
 }
 
-// Google Sheets 1899 Time Bug Fixer
-function parseSheetDate(timeStr, baseDateStr) {
+// FIX: Smartly merge Google Sheets 1899 Time quirk with the actual visit date
+function formatSheetDateTime(dateStr, timeStr) {
     if (!timeStr) return null;
-    let d = new Date(timeStr);
-    if (isNaN(d)) return null;
-    
-    // If Google Sheets returns year 1899 or 1970 for time-only fields, merge with actual base date
-    if (d.getFullYear() <= 1970 && baseDateStr) {
-        let baseD = new Date(baseDateStr);
-        if (!isNaN(baseD)) {
-            d.setFullYear(baseD.getFullYear(), baseD.getMonth(), baseD.getDate());
-        }
+    let t = new Date(timeStr);
+    if (isNaN(t)) return timeStr; // Fallback to raw text if parsing fails
+
+    // If year is valid (> 1970), just format the timeStr directly
+    if (t.getFullYear() > 1970) {
+        return t.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     }
-    return d;
+
+    // Otherwise, extract JUST the time part from the 1899 date
+    let timePart = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    // Look at the base date string to get the Month/Day/Year
+    let d = new Date(dateStr);
+    if (!dateStr || isNaN(d) || d.getFullYear() <= 1970) {
+        return timePart; // Just return the time if no valid date exists
+    }
+
+    // Combine Date and Time
+    let datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${datePart}, ${timePart}`;
 }
 
 function validateSession() {
@@ -255,7 +264,7 @@ function renderFeatureFlagsAdminUI() {
 
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
         return;
     }
 
@@ -886,31 +895,51 @@ function renderVisits() {
     const container = document.getElementById('visitLogsContainer'); if (!container) return;
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
-    let sorted = [...globalVisits].sort((a, b) => {
-        let dA = parseSheetDate(a.time_in || a.date, a.date) || new Date(0);
-        let dB = parseSheetDate(b.time_in || b.date, b.date) || new Date(0);
-        return dB - dA;
-    });
+    const getSortValue = (v) => {
+        let d1 = new Date(v.date || 0);
+        let d2 = new Date(v.time_in || 0);
+        return (d2.getFullYear() > 1970) ? d2.getTime() : d1.getTime();
+    };
+
+    let sorted = [...globalVisits].sort((a, b) => getSortValue(b) - getSortValue(a));
 
     let html = '';
     sorted.forEach(v => {
-        let isCompleted = (v.time_out && v.time_out.trim() !== "");
-        let statColor = isCompleted ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
-        let statusText = isCompleted ? 'Completed' : 'Ongoing';
+        let dbStatus = v.status || '';
+        let isCompleted = (dbStatus.toLowerCase() === 'completed') || (v.time_out && String(v.time_out).trim() !== "");
+        let isCancelled = (dbStatus.toLowerCase() === 'cancelled');
+        let statusText = dbStatus || (isCompleted ? "Completed" : "Ongoing");
+        
+        let statColor = 'text-amber-700 bg-amber-50 border-amber-200';
+        if (isCompleted) statColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (isCancelled) statColor = 'text-rose-700 bg-rose-50 border-rose-200';
         
         let mapLink = v.latitude && v.longitude 
             ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        let dIn = parseSheetDate(v.time_in || v.date, v.date);
-        let dOut = parseSheetDate(v.time_out, v.date);
-        let dSchedule = parseSheetDate(v.date, v.date);
+        let inDisplay = formatSheetDateTime(v.date, v.time_in) || "Not Started";
+        let exitDisplay = formatSheetDateTime(v.date, v.time_out) || "Pending";
+        
+        let scheduleDisplay = v.date ? new Date(v.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
 
-        let inDisplay = dIn ? dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "No Entry Time";
-        let exitDisplay = dOut ? dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "Pending";
-        let scheduleDisplay = dSchedule ? dSchedule.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
-
-        let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
+        let durationDisplay;
+        if (v.duration && String(v.duration).trim() !== "") {
+            durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>`;
+        } else if (v.time_in && v.time_out) {
+            let dIn = new Date(v.time_in);
+            let dOut = new Date(v.time_out);
+            if (!isNaN(dIn) && !isNaN(dOut)) {
+                let diffMs = dOut - dIn;
+                if (diffMs >= 0) {
+                    let hrs = Math.floor(diffMs / (1000 * 60 * 60));
+                    let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                    durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${hrs}h ${mins}m</span>`;
+                } else { durationDisplay = '<span class="text-rose-500 font-bold">Time Error</span>'; }
+            }
+        } else {
+            durationDisplay = isCompleted ? '<span class="text-slate-400 font-medium">N/A</span>' : '<span class="text-slate-400 font-medium">Ongoing</span>';
+        }
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
