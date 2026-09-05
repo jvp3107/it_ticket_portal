@@ -144,7 +144,6 @@
 
             <!-- TAB: Global Queue View -->
             <div id="noc-allView" class="animate-fade-in">
-                
                 <!-- KPI Cards (6 Tiles) -->
                 <div class="grid grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
                     <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-blue-50 border-blue-100 border cursor-pointer" onclick="setQuickFilter('All')">
@@ -233,7 +232,7 @@
                 </div>
             </div>
 
-            <!-- TAB: FIELD VISITS & LOCATIONS -->
+            <!-- TAB: FIELD VISITS & LOCATIONS (UPDATED MATCHING ANDROID APP DB SCHEMA) -->
             <div id="noc-visitsView" class="hidden animate-fade-in max-w-6xl mx-auto">
                 <div class="mb-10 text-center">
                     <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Client Visit Log & Location Mapping</h2>
@@ -241,60 +240,66 @@
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Add Visit Form -->
+                    <!-- Add Visit Form (Strict DB Schema Match) -->
                     <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-emerald-500 bg-white">
                         <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-location-dot text-emerald-600 mr-2"></i> Schedule / Log Visit</h3>
+                        
                         <form onsubmit="saveVisitLog(event)" class="space-y-4">
+                            <!-- Hidden Database Keys -->
                             <input type="hidden" id="visitId">
+                            <input type="hidden" id="visitLat">
+                            <input type="hidden" id="visitLng">
                             
                             <div class="itsm-input-wrapper mb-0">
                                 <select id="visitCompany" required class="itsm-input appearance-none pl-4 cursor-pointer" onchange="autoFillVisitDetails()"></select>
                                 <span class="itsm-label" style="left:16px;">Client Company *</span>
                             </div>
                             
-                            <div class="itsm-input-wrapper mb-0">
-                                <input type="text" id="visitLocation" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
-                                <span class="itsm-label" style="left:16px;">Map Location / Branch *</span>
+                            <div class="itsm-input-wrapper mb-0 relative">
+                                <input type="text" id="visitAddress" required class="itsm-input pl-4 pr-12" placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Address Location *</span>
+                                <button type="button" onclick="getLocation()" class="absolute right-3 top-4 text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-lg transition" title="Get GPS Coordinates"><i class="fa-solid fa-location-crosshairs"></i></button>
                             </div>
                             
-                            <!-- NEW IN/OUT TIME GRID -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0">
                                 <div class="itsm-input-wrapper mb-0">
                                     <input type="datetime-local" id="visitInTime" required class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">In Time *</span>
+                                    <span class="itsm-label" style="left:16px;">Time In *</span>
                                 </div>
                                 <div class="itsm-input-wrapper mb-0">
-                                    <input type="datetime-local" id="visitDate" required class="itsm-input pl-4" placeholder=" ">
-                                    <span class="itsm-label" style="left:16px;">Out Time *</span>
+                                    <input type="datetime-local" id="visitOutTime" class="itsm-input pl-4" placeholder=" ">
+                                    <span class="itsm-label" style="left:16px;">Time Out</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="visitClientContact" class="itsm-input pl-4" placeholder=" ">
+                                    <span class="itsm-label" style="left:16px;">Client Contact</span>
+                                </div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="visitClientPhone" class="itsm-input pl-4" placeholder=" ">
+                                    <span class="itsm-label" style="left:16px;">Client Phone</span>
                                 </div>
                             </div>
 
                             <div class="itsm-input-wrapper mb-0 mt-4">
-                                <select id="visitTicketRef" multiple class="itsm-input appearance-none pl-4 cursor-pointer text-blue-700 font-bold bg-blue-50/50 overflow-y-auto" onchange="autoFillPurposeFromTicket()" style="min-height: 100px; padding-top: 25px; padding-bottom: 10px;">
-                                </select>
-                                <span class="itsm-label" style="left:16px;">Linked Tickets (Hold Ctrl to select multiple)</span>
+                                <textarea id="visitDeviceDetails" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea>
+                                <span class="itsm-label" style="left:16px;">Device Details / Purpose</span>
                             </div>
 
-                            <div class="itsm-input-wrapper mb-0">
-                                <input type="text" id="visitPurpose" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
-                                <span class="itsm-label" style="left:16px;">Purpose *</span>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="visitPhotoUrl" class="itsm-input pl-4" placeholder=" ">
+                                    <span class="itsm-label" style="left:16px;">Photo URL</span>
+                                </div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="visitDocuments" class="itsm-input pl-4" placeholder=" ">
+                                    <span class="itsm-label" style="left:16px;">Documents (Links)</span>
+                                </div>
                             </div>
                             
-                            <div class="itsm-input-wrapper mb-0">
-                                <select id="visitStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
-                                    <option value="Scheduled" selected>Scheduled</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Cancelled">Cancelled</option>
-                                </select>
-                                <span class="itsm-label" style="left:16px;">Status</span>
-                            </div>
-                            
-                            <div class="itsm-input-wrapper mb-0">
-                                <textarea id="visitNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea>
-                                <span class="itsm-label" style="left:16px;">Outcome / Notes</span>
-                            </div>
-                            
-                            <div class="flex gap-2 mt-4">
+                            <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
                                 <button type="button" onclick="clearVisitForm()" class="w-1/3 bg-slate-100 text-slate-600 border border-slate-200 font-bold py-3 rounded-full hover:bg-slate-200 transition-all text-xs">Clear</button>
                                 <button type="submit" id="btnSaveVisit" class="w-2/3 bg-emerald-600 text-white font-bold py-3 rounded-full shadow-md hover:-translate-y-1 hover:bg-emerald-500 transition-all text-sm">Save Log</button>
                             </div>
@@ -502,7 +507,7 @@
                     </div>
                 </div>
 
-                <!-- Sub-tab: Platform Settings, Feature Flags & Apps -->
+                <!-- Sub-tab: Platform Settings & Feature Flags -->
                 <div id="admTab-apps" class="hidden animate-fade-in max-w-5xl mx-auto">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         
@@ -525,7 +530,7 @@
                             <button onclick="savePlatformSettings()" class="w-full bg-blue-600 text-white py-4 rounded-full text-sm font-bold shadow-md hover:bg-blue-500 transition-colors active:scale-95">Save Settings to Database</button>
                         </div>
 
-                        <!-- Feature Flags Toggle Column (Scrollable Container Added) -->
+                        <!-- Feature Flags Toggle Column -->
                         <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white self-start">
                             <div class="flex items-center mb-6">
                                 <div class="w-14 h-14 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl mr-5 shadow-sm"><i class="fa-solid fa-toggle-on"></i></div>
