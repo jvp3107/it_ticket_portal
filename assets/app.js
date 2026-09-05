@@ -77,6 +77,22 @@ function getSLAString(startDateStr, priority, status) {
     return `<span class="text-emerald-600 font-bold font-mono text-xs">${hrs}h ${mins}m left</span>`;
 }
 
+// Google Sheets 1899 Time Bug Fixer
+function parseSheetDate(timeStr, baseDateStr) {
+    if (!timeStr) return null;
+    let d = new Date(timeStr);
+    if (isNaN(d)) return null;
+    
+    // If Google Sheets returns year 1899 or 1970 for time-only fields, merge with actual base date
+    if (d.getFullYear() <= 1970 && baseDateStr) {
+        let baseD = new Date(baseDateStr);
+        if (!isNaN(baseD)) {
+            d.setFullYear(baseD.getFullYear(), baseD.getMonth(), baseD.getDate());
+        }
+    }
+    return d;
+}
+
 function validateSession() {
     const storedClient = sessionStorage.getItem('spread_client_session');
     const storedAdmin = sessionStorage.getItem('spread_admin_session');
@@ -239,7 +255,7 @@ function renderFeatureFlagsAdminUI() {
 
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
         return;
     }
 
@@ -871,9 +887,9 @@ function renderVisits() {
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
     let sorted = [...globalVisits].sort((a, b) => {
-        let dA = a.time_in || a.date || a.time_out || 0;
-        let dB = b.time_in || b.date || b.time_out || 0;
-        return new Date(dB) - new Date(dA);
+        let dA = parseSheetDate(a.time_in || a.date, a.date) || new Date(0);
+        let dB = parseSheetDate(b.time_in || b.date, b.date) || new Date(0);
+        return dB - dA;
     });
 
     let html = '';
@@ -886,16 +902,14 @@ function renderVisits() {
             ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        const formatDate = (dateStr) => {
-            if (!dateStr) return null;
-            let d = new Date(dateStr);
-            return isNaN(d) ? dateStr : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-        };
+        let dIn = parseSheetDate(v.time_in || v.date, v.date);
+        let dOut = parseSheetDate(v.time_out, v.date);
+        let dSchedule = parseSheetDate(v.date, v.date);
 
-        let scheduleDisplay = formatDate(v.date) || "No Schedule Date";
-        let inDisplay = formatDate(v.time_in) || "Not Started";
-        let exitDisplay = formatDate(v.time_out) || "Pending";
-        
+        let inDisplay = dIn ? dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "No Entry Time";
+        let exitDisplay = dOut ? dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "Pending";
+        let scheduleDisplay = dSchedule ? dSchedule.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
+
         let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
