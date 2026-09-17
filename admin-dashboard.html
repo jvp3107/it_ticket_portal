@@ -80,20 +80,48 @@
     <!-- ADMIN MANAGEMENT MODALS -->
     <div id="editCorpUserModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
         <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white" id="editCorpUserModalBox">
-            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-pen text-emerald-500 mr-2"></i>Edit Profile</h3>
-            <input type="hidden" id="editCorpUserEmail">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-pen text-emerald-500 mr-2"></i> Edit Client Profile</h3>
+            
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-envelope input-icon text-slate-400"></i>
+                <input type="email" id="editCorpUserEmail" class="itsm-input pl-10 bg-slate-50 cursor-not-allowed text-slate-500 font-bold" readonly placeholder=" ">
+                <span class="itsm-label" style="left:44px;">Corporate Email</span>
+            </div>
+
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-key input-icon text-amber-500"></i>
+                <input type="text" id="editCorpUserPassword" class="itsm-input pl-10 border-amber-200 focus:border-amber-500" placeholder=" " autocomplete="off">
+                <span class="itsm-label text-amber-600 font-bold" style="left:44px;">Reset Password (Optional)</span>
+            </div>
+
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-building input-icon"></i><select id="editCorpUserCompany" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span class="itsm-label" style="left:44px;">Company</span></div>
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon"></i><input type="tel" id="editCorpUserPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Phone Number</span></div>
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-sitemap input-icon"></i><select id="editCorpUserManager" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span class="itsm-label" style="left:44px;">Assign Manager</span></div>
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tag input-icon"></i><select id="editCorpUserRole" class="itsm-input appearance-none pl-10 cursor-pointer"><option value="Client">Standard Employee</option><option value="Approver">Approver / Manager</option></select><span class="itsm-label" style="left:44px;">Role</span></div>
-            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5"><button onclick="closeEditCorpUserModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button onclick="saveCorpUserEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Save</button></div>
+            
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5">
+                <button onclick="closeEditCorpUserModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button>
+                <button onclick="saveCorpUserEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update Profile</button>
+            </div>
         </div>
     </div>
 
     <div id="editITStaffModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
         <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white" id="editITStaffModalBox">
             <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-shield text-blue-500 mr-2"></i> Edit IT Staff</h3>
-            <input type="hidden" id="editITStaffEmail">
+            
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-envelope input-icon text-slate-400"></i>
+                <input type="email" id="editITStaffEmail" class="itsm-input pl-10 bg-slate-50 cursor-not-allowed text-slate-500 font-bold" readonly placeholder=" ">
+                <span class="itsm-label" style="left:44px;">Staff Email Address</span>
+            </div>
+
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-key input-icon text-amber-500"></i>
+                <input type="text" id="editITStaffPassword" class="itsm-input pl-10 border-amber-200 focus:border-amber-500" placeholder=" " autocomplete="off">
+                <span class="itsm-label text-amber-600 font-bold" style="left:44px;">Reset Password (Optional)</span>
+            </div>
+
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon text-slate-400"></i><input type="tel" id="editITStaffPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Phone Number</span></div>
             <div class="itsm-input-wrapper mb-4"><i class="fa-brands fa-telegram input-icon text-blue-500"></i><input type="text" id="editITStaffTelegram" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Telegram Chat ID</span></div>
             
@@ -109,7 +137,10 @@
                 <span class="itsm-label" style="left:44px;">Privilege Role</span>
             </div>
 
-            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5"><button onclick="closeEditITStaffModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button onclick="saveITStaffEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update</button></div>
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5">
+                <button onclick="closeEditITStaffModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button>
+                <button onclick="saveITStaffEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update Staff</button>
+            </div>
         </div>
     </div>
 
@@ -573,7 +604,6 @@
                                 <span class="itsm-label" style="left:16px;">Primary Domain</span>
                             </div>
                             
-                            <!-- NEW: Admin Email field -->
                             <div class="itsm-input-wrapper mb-0">
                                 <input type="email" id="newRegAdminEmail" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
                                 <span class="itsm-label" style="left:16px;">Admin Email (For Asset Alerts) *</span>
