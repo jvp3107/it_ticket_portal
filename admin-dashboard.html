@@ -289,62 +289,196 @@
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Add Inventory Form -->
+                    <!-- Add Inventory Form (UPDATED WITH DETAILED HARDWARE SPECS) -->
                     <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-indigo-500 bg-white">
                         <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-laptop-medical text-indigo-600 mr-2"></i> Register Asset</h3>
                         
                         <form onsubmit="saveAsset(event)" class="space-y-4">
-                            <div class="itsm-input-wrapper mb-0">
-                                <input type="text" id="invAssetTag" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
-                                <span class="itsm-label" style="left:16px;">Asset ID / Tag *</span>
+                            
+                            <!-- Basic Identifiers -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0">
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="invAssetTag" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                    <span class="itsm-label" style="left:16px;">Asset ID / Tag *</span>
+                                </div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <select id="invCompany" required class="itsm-input appearance-none pl-4 cursor-pointer" onchange="filterInventoryUsers()"></select>
+                                    <span class="itsm-label" style="left:16px;">Client Company *</span>
+                                </div>
                             </div>
 
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <select id="invCompany" required class="itsm-input appearance-none pl-4 cursor-pointer" onchange="filterInventoryUsers()"></select>
-                                <span class="itsm-label" style="left:16px;">Client Company *</span>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
+                                <div class="itsm-input-wrapper mb-0">
+                                    <select id="invAssignedUser" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                        <option value="IT Stock">Unassigned (IT Stock)</option>
+                                    </select>
+                                    <span class="itsm-label" style="left:16px;">Assign To</span>
+                                </div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <select id="invDeviceType" required class="itsm-input appearance-none pl-4 cursor-pointer">
+                                        <option value="" disabled selected></option>
+                                        <option value="Laptop">Laptop</option>
+                                        <option value="Desktop">Desktop PC</option>
+                                        <option value="Monitor">Monitor</option>
+                                        <option value="Network Device">Network / Router</option>
+                                        <option value="Peripheral">Peripheral / Other</option>
+                                    </select>
+                                    <span class="itsm-label" style="left:16px;">Device Type *</span>
+                                </div>
                             </div>
 
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <select id="invAssignedUser" class="itsm-input appearance-none pl-4 cursor-pointer">
-                                    <option value="IT Stock">Unassigned (IT Stock)</option>
-                                </select>
-                                <span class="itsm-label" style="left:16px;">Assign To</span>
-                            </div>
-                            
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <select id="invDeviceType" required class="itsm-input appearance-none pl-4 cursor-pointer">
-                                    <option value="" disabled selected></option>
-                                    <option value="Laptop">Laptop</option>
-                                    <option value="Desktop">Desktop PC</option>
-                                    <option value="Monitor">Monitor</option>
-                                    <option value="Network Device">Network / Router</option>
-                                    <option value="Peripheral">Peripheral / Other</option>
-                                </select>
-                                <span class="itsm-label" style="left:16px;">Device Type *</span>
-                            </div>
-                            
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <input type="text" id="invBrandModel" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
-                                <span class="itsm-label" style="left:16px;">Brand & Model *</span>
-                            </div>
+                            <!-- Hardware Specifications Block -->
+                            <div class="bg-indigo-50/50 border border-indigo-100 p-4 rounded-[20px] mt-4">
+                                <h4 class="text-[10px] font-black text-indigo-600 mb-3 uppercase tracking-wider"><i class="fa-solid fa-microchip mr-1"></i> Hardware Specifications</h4>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invMake" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Select Make</option>
+                                            <option value="Dell">Dell</option>
+                                            <option value="HP">HP</option>
+                                            <option value="Lenovo">Lenovo</option>
+                                            <option value="Apple">Apple</option>
+                                            <option value="Asus">Asus</option>
+                                            <option value="Acer">Acer</option>
+                                            <option value="Custom/Other">Custom / Other</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">Make</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <input type="text" id="invModel" class="itsm-input pl-4 bg-white border-white shadow-sm" placeholder=" " autocomplete="off">
+                                        <span class="itsm-label" style="left:16px;">Model (e.g. T14)</span>
+                                    </div>
+                                </div>
 
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <input type="text" id="invSerialNumber" class="itsm-input pl-4" placeholder=" " autocomplete="off">
-                                <span class="itsm-label" style="left:16px;">Serial / IMEI Number</span>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invProcessorBrand" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Processor Brand</option>
+                                            <option value="Intel">Intel</option>
+                                            <option value="AMD">AMD</option>
+                                            <option value="Apple">Apple Silicon</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">CPU Brand</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invProcessorType" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Processor Type</option>
+                                            <optgroup label="Intel (Modern)">
+                                                <option value="Core Ultra 9">Intel Core Ultra 9</option>
+                                                <option value="Core Ultra 7">Intel Core Ultra 7</option>
+                                                <option value="Core Ultra 5">Intel Core Ultra 5</option>
+                                            </optgroup>
+                                            <optgroup label="Intel (Standard)">
+                                                <option value="Core i9">Intel Core i9</option>
+                                                <option value="Core i7">Intel Core i7</option>
+                                                <option value="Core i5">Intel Core i5</option>
+                                                <option value="Core i3">Intel Core i3</option>
+                                            </optgroup>
+                                            <optgroup label="AMD">
+                                                <option value="Ryzen 9">AMD Ryzen 9</option>
+                                                <option value="Ryzen 7">AMD Ryzen 7</option>
+                                                <option value="Ryzen 5">AMD Ryzen 5</option>
+                                                <option value="Ryzen 3">AMD Ryzen 3</option>
+                                            </optgroup>
+                                            <optgroup label="Apple">
+                                                <option value="M3 Max/Pro">Apple M3 Series</option>
+                                                <option value="M2 Max/Pro">Apple M2 Series</option>
+                                                <option value="M1 Max/Pro">Apple M1 Series</option>
+                                            </optgroup>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">CPU Model</span>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 mb-3">
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invRAM" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Capacity</option>
+                                            <option value="8 GB">8 GB</option>
+                                            <option value="16 GB">16 GB</option>
+                                            <option value="32 GB">32 GB</option>
+                                            <option value="64 GB">64 GB</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">RAM</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invRAMType" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Type</option>
+                                            <option value="DDR4">DDR4</option>
+                                            <option value="DDR5">DDR5</option>
+                                            <option value="LPDDR5">LPDDR5</option>
+                                            <option value="Unified">Unified</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">RAM Type</span>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 mb-3">
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invStorageCap" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Capacity</option>
+                                            <option value="256 GB">256 GB</option>
+                                            <option value="500 GB">500 GB</option>
+                                            <option value="1 TB">1 TB</option>
+                                            <option value="2 TB">2 TB</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">Storage</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invStorageType" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Type</option>
+                                            <option value="NVMe SSD">NVMe SSD</option>
+                                            <option value="SATA SSD">SATA SSD</option>
+                                            <option value="HDD">HDD</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">Drive Type</span>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invGPU" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Select GPU</option>
+                                            <option value="Integrated Graphics">Integrated</option>
+                                            <option value="NVIDIA Dedicated">NVIDIA Dedicated</option>
+                                            <option value="AMD Dedicated">AMD Dedicated</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">Graphics / GPU</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invDisplay" class="itsm-input appearance-none pl-4 cursor-pointer bg-white border-white shadow-sm">
+                                            <option value="" disabled selected>Select Size</option>
+                                            <option value="13 inch">13"</option>
+                                            <option value="14 inch">14"</option>
+                                            <option value="15.6 inch">15.6"</option>
+                                            <option value="16 inch">16"</option>
+                                            <option value="Desktop Monitor">Ext. Monitor</option>
+                                        </select>
+                                        <span class="itsm-label" style="left:16px;">Display Size</span>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <div class="itsm-input-wrapper mb-0 mt-4">
-                                <select id="invStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
-                                    <option value="Active" selected>Active</option>
-                                    <option value="In Repair">In Repair</option>
-                                    <option value="Retired">Retired / Deprecated</option>
-                                </select>
-                                <span class="itsm-label" style="left:16px;">Asset Status</span>
+                            <!-- End Hardware Specs -->
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-0 mt-4">
+                                <div class="itsm-input-wrapper mb-0">
+                                    <input type="text" id="invSerialNumber" class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                    <span class="itsm-label" style="left:16px;">Serial / IMEI Number</span>
+                                </div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <select id="invStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                        <option value="Active" selected>Active</option>
+                                        <option value="In Repair">In Repair</option>
+                                        <option value="Retired">Retired / Deprecated</option>
+                                    </select>
+                                    <span class="itsm-label" style="left:16px;">Asset Status</span>
+                                </div>
                             </div>
                             
                             <div class="itsm-input-wrapper mb-0 mt-4">
                                 <textarea id="invNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea>
-                                <span class="itsm-label" style="left:16px;">Notes / Specs</span>
+                                <span class="itsm-label" style="left:16px;">Additional Notes</span>
                             </div>
                             
                             <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
