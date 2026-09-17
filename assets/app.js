@@ -392,6 +392,17 @@ async function handleITLogin(e) {
     btn.innerHTML = "Login Admin"; btn.disabled = false;
 }
 
+async function resetITStaffPassword(email) {
+    const newPass = prompt(`Enter new password for ${email}:`);
+    if (!newPass) return;
+    try {
+        await apiPost({ action: 'reset_password', email: email, new_password: newPass, password: newPass });
+        alert("Password updated successfully!");
+    } catch(e) {
+        alert("Failed to reset password.");
+    }
+}
+
 // ==========================================
 // TAB SWITCHING (DASHBOARDS)
 // ==========================================
@@ -684,7 +695,7 @@ async function managerApproveReject(ticketId, newStatus) {
 }
 
 // ==========================================
-// MASTER NOC ENGINE (OPTIMIZED)
+// MASTER NOC ENGINE
 // ==========================================
 function startNocPolling() {
     if (nocPollingTimer) clearInterval(nocPollingTimer);
@@ -854,8 +865,27 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// ASSET INVENTORY ENGINE (NEW)
+// ASSET INVENTORY ENGINE
 // ==========================================
+function updateInventoryUserFilter() {
+    const compFilter = document.getElementById('inventoryCompanyFilter').value;
+    const userFilterSelect = document.getElementById('inventoryUserFilter');
+    if (!userFilterSelect) return;
+    
+    let html = '<option value="All">All Users</option>';
+    let users = globalUsersList;
+    if(compFilter !== 'All') {
+        users = globalUsersList.filter(u => u.company === compFilter);
+    }
+    
+    html += `<option value="IT Stock">IT Stock (Unassigned)</option>`;
+    users.forEach(u => {
+        html += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)}</option>`;
+    });
+    
+    userFilterSelect.innerHTML = html;
+}
+
 function populateInventoryCompanies() {
     const compSelect = document.getElementById('invCompany');
     if (compSelect && globalRegisteredCompanies.length > 0) {
@@ -867,6 +897,7 @@ function populateInventoryCompanies() {
         if (filterSelect) {
             filterSelect.innerHTML = '<option value="All">All Companies</option>' + html.replace('<option value="" disabled selected>Select Company</option>', '');
         }
+        updateInventoryUserFilter();
     }
 }
 
@@ -896,10 +927,15 @@ function renderInventory() {
     if (!container) return;
     
     const companyFilter = document.getElementById('inventoryCompanyFilter')?.value || 'All';
-    let filtered = globalInventory.filter(i => companyFilter === 'All' || i.company === companyFilter);
+    const userFilter = document.getElementById('inventoryUserFilter')?.value || 'All';
+    
+    let filtered = globalInventory.filter(i => 
+        (companyFilter === 'All' || i.company === companyFilter) &&
+        (userFilter === 'All' || i.assigned_to === userFilter)
+    );
 
     if (filtered.length === 0) { 
-        container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No assets registered.</p>'; 
+        container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No assets found for this filter.</p>'; 
         return; 
     }
 
@@ -939,17 +975,22 @@ async function saveAsset(e) {
     const btn = document.getElementById('btnSaveAsset'); 
     btn.innerHTML = "Saving & Emailing..."; btn.disabled = true;
 
-    // We use a custom 'save_company_asset' action to trigger the App Script email.
+    // Fetch the admin email for this specific company
+    const companyName = document.getElementById('invCompany').value;
+    const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
+    const adminEmail = compObj ? (compObj.admin_email || '') : '';
+
     const payload = {
         action: 'save_company_asset', 
         asset_tag: document.getElementById('invAssetTag').value.trim(),
-        company: document.getElementById('invCompany').value,
+        company: companyName,
         assigned_to: document.getElementById('invAssignedUser').value,
         device_type: document.getElementById('invDeviceType').value,
         brand_model: document.getElementById('invBrandModel').value.trim(),
         serial_number: document.getElementById('invSerialNumber').value.trim(),
         status: document.getElementById('invStatus').value,
-        notes: document.getElementById('invNotes').value.trim()
+        notes: document.getElementById('invNotes').value.trim(),
+        admin_email: adminEmail
     };
 
     try { 
@@ -961,7 +1002,7 @@ async function saveAsset(e) {
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
         fetchInventory(); 
-        alert("Asset saved! Handover email sent to the assigned user."); 
+        alert("Asset saved! Handover alert sent to the company administrator."); 
     } catch (e) { alert("Network error saving asset."); }
     btn.innerHTML = "Save & Send Handover Alert"; btn.disabled = false;
 }
@@ -1036,28 +1077,15 @@ function renderVisits() {
             ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        let inDisplay = formatSheetDateTime(v.date, v.time_in) || "Not Started";
-        let exitDisplay = formatSheetDateTime(v.date, v.time_out) || "Pending";
-        
-        let scheduleDisplay = v.date ? new Date(v.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
+        let dIn = parseSheetDate(v.time_in || v.date, v.date);
+        let dOut = parseSheetDate(v.time_out, v.date);
+        let dSchedule = parseSheetDate(v.date, v.date);
 
-        let durationDisplay;
-        if (v.duration && String(v.duration).trim() !== "") {
-            durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>`;
-        } else if (v.time_in && v.time_out) {
-            let dIn = new Date(v.time_in);
-            let dOut = new Date(v.time_out);
-            if (!isNaN(dIn) && !isNaN(dOut)) {
-                let diffMs = dOut - dIn;
-                if (diffMs >= 0) {
-                    let hrs = Math.floor(diffMs / (1000 * 60 * 60));
-                    let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                    durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${hrs}h ${mins}m</span>`;
-                } else { durationDisplay = '<span class="text-rose-500 font-bold">Time Error</span>'; }
-            }
-        } else {
-            durationDisplay = isCompleted ? '<span class="text-slate-400 font-medium">N/A</span>' : '<span class="text-slate-400 font-medium">Ongoing</span>';
-        }
+        let inDisplay = dIn ? dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "No Entry Time";
+        let exitDisplay = dOut ? dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "Pending";
+        let scheduleDisplay = dSchedule ? dSchedule.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
+
+        let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
@@ -1205,7 +1233,9 @@ function renderUsersList() {
     globalUsersList.forEach(u => {
         if (u.role !== 'Client' && u.role !== 'Approver') {
             let telegramBadge = u.telegram_id ? `<span class="px-2 py-0.5 ml-3 bg-blue-50 border border-blue-200 text-blue-600 rounded text-[9px] shadow-sm"><i class="fa-brands fa-telegram"></i> ${escapeHTML(u.telegram_id)}</span>` : '';
-            itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span><button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
+            itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span>
+            <button onclick="resetITStaffPassword('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 shadow-sm transition-all" title="Reset Password"><i class="fa-solid fa-key text-xs"></i></button>
+            <button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
         }
     });
     itContainer.innerHTML = itHTML || '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-4">No IT admins found.</p>';
@@ -1249,15 +1279,15 @@ function renderRegisteredCompanies() {
 
 async function registerNewCompany(e) {
     e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]'); btn.innerHTML = "Registering..."; btn.disabled = true;
-    const payload = { action: 'db_upsert', target_sheet: 'Companies', primary_key: 'company', company: document.getElementById('newRegCompanyName').value.trim(), domain: document.getElementById('newRegDomain').value.trim(), address: document.getElementById('newRegAddress').value.trim(), phone: document.getElementById('newRegPhone').value.trim(), it_contact: document.getElementById('newRegContact').value.trim(), created_date: new Date().toISOString() };
+    const payload = { action: 'db_upsert', target_sheet: 'Companies', primary_key: 'company', company: document.getElementById('newRegCompanyName').value.trim(), domain: document.getElementById('newRegDomain').value.trim(), admin_email: document.getElementById('newRegAdminEmail').value.trim(), address: document.getElementById('newRegAddress').value.trim(), phone: document.getElementById('newRegPhone').value.trim(), it_contact: document.getElementById('newRegContact').value.trim(), created_date: new Date().toISOString() };
     try { await apiPost(payload); alert("Company Registered Successfully!"); e.target.reset(); fetchUsersList(); } catch (e) { alert("Network error."); }
     btn.innerHTML = "Register Company"; btn.disabled = false;
 }
 
 function openEditCompanyModal(companyName) {
     const comp = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName); if (!comp) return;
-    document.getElementById('editCompName').value = companyName; document.getElementById('editCompDomain').value = comp.domain || ''; document.getElementById('editCompAddress').value = comp.address || ''; document.getElementById('editCompPhone').value = comp.phone || ''; document.getElementById('editCompContact').value = comp.it_contact || ''; document.getElementById('editCompNotes').value = comp.notes || '';
-    ['editCompDomain', 'editCompAddress', 'editCompPhone', 'editCompContact', 'editCompNotes'].forEach(id => { const el = document.getElementById(id); if (el.value) el.classList.add('has-val'); else el.classList.remove('has-val'); });
+    document.getElementById('editCompName').value = companyName; document.getElementById('editCompDomain').value = comp.domain || ''; document.getElementById('editCompAdminEmail').value = comp.admin_email || ''; document.getElementById('editCompAddress').value = comp.address || ''; document.getElementById('editCompPhone').value = comp.phone || ''; document.getElementById('editCompContact').value = comp.it_contact || ''; document.getElementById('editCompNotes').value = comp.notes || '';
+    ['editCompDomain', 'editCompAdminEmail', 'editCompAddress', 'editCompPhone', 'editCompContact', 'editCompNotes'].forEach(id => { const el = document.getElementById(id); if (el.value) el.classList.add('has-val'); else el.classList.remove('has-val'); });
     const modalBox = document.getElementById('editCompanyModalBox'); const modal = document.getElementById('editCompanyModal');
     modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalBox.classList.remove('scale-95'); }, 10);
 }
@@ -1269,7 +1299,7 @@ function closeEditCompanyModal() {
 
 async function saveCompanyEdits(e) {
     const btn = e.target; btn.innerHTML = "Saving..."; btn.disabled = true;
-    const payload = { action: 'db_upsert', target_sheet: 'Companies', primary_key: 'company', company: document.getElementById('editCompName').value, domain: document.getElementById('editCompDomain').value.trim(), address: document.getElementById('editCompAddress').value.trim(), phone: document.getElementById('editCompPhone').value.trim(), it_contact: document.getElementById('editCompContact').value.trim(), notes: document.getElementById('editCompNotes').value.trim() };
+    const payload = { action: 'db_upsert', target_sheet: 'Companies', primary_key: 'company', company: document.getElementById('editCompName').value, domain: document.getElementById('editCompDomain').value.trim(), admin_email: document.getElementById('editCompAdminEmail').value.trim(), address: document.getElementById('editCompAddress').value.trim(), phone: document.getElementById('editCompPhone').value.trim(), it_contact: document.getElementById('editCompContact').value.trim(), notes: document.getElementById('editCompNotes').value.trim() };
     try { await apiPost(payload); closeEditCompanyModal(); fetchUsersList(); } catch (e) { alert("Error saving company profile."); }
     btn.innerHTML = "Save Profile"; btn.disabled = false;
 }
