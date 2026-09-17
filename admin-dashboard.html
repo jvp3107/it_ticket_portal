@@ -96,7 +96,19 @@
             <input type="hidden" id="editITStaffEmail">
             <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon text-slate-400"></i><input type="tel" id="editITStaffPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Phone Number</span></div>
             <div class="itsm-input-wrapper mb-4"><i class="fa-brands fa-telegram input-icon text-blue-500"></i><input type="text" id="editITStaffTelegram" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Telegram Chat ID</span></div>
-            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tag input-icon text-slate-400"></i><select id="editITStaffRole" class="itsm-input appearance-none pl-10 cursor-pointer"><option value="Tier 1 Support">Tier 1 Support</option><option value="Master Admin">Master Admin</option></select><span class="itsm-label" style="left:44px;">Privilege Role</span></div>
+            
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-user-tag input-icon text-slate-400"></i>
+                <select id="editITStaffRole" class="itsm-input appearance-none pl-10 cursor-pointer">
+                    <option value="Tier 1 Support">Tier 1 Support</option>
+                    <option value="Tier 2 Support">Tier 2 Support</option>
+                    <option value="System Admin">System Admin</option>
+                    <option value="Master Admin">Master Admin</option>
+                    <option value="Super Admin">Super Admin</option>
+                </select>
+                <span class="itsm-label" style="left:44px;">Privilege Role</span>
+            </div>
+
             <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5"><button onclick="closeEditITStaffModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button onclick="saveITStaffEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update</button></div>
         </div>
     </div>
@@ -233,7 +245,7 @@
                 </div>
             </div>
 
-            <!-- TAB: FIELD VISITS & LOCATIONS (UPDATED MATCHING ANDROID APP DB SCHEMA) -->
+            <!-- TAB: FIELD VISITS & LOCATIONS -->
             <div id="noc-visitsView" class="hidden animate-fade-in max-w-6xl mx-auto">
                 <div class="mb-10 text-center">
                     <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Client Visit Log & Location Mapping</h2>
@@ -241,7 +253,7 @@
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Add Visit Form (Strict DB Schema Match) -->
+                    <!-- Add Visit Form -->
                     <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-emerald-500 bg-white">
                         <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-location-dot text-emerald-600 mr-2"></i> Schedule / Log Visit</h3>
                         
@@ -496,13 +508,18 @@
                                 <input type="email" id="newAdminEmail" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
                                 <span class="itsm-label" style="left:16px;">Staff Email Address</span>
                             </div>
+                            
                             <div class="itsm-input-wrapper mb-0">
                                 <select id="newAdminRole" class="itsm-input appearance-none pl-4 cursor-pointer">
                                     <option value="Tier 1 Support" selected>Tier 1 Support</option>
+                                    <option value="Tier 2 Support">Tier 2 Support</option>
+                                    <option value="System Admin">System Admin</option>
                                     <option value="Master Admin">Master Admin</option>
+                                    <option value="Super Admin">Super Admin</option>
                                 </select>
                                 <span class="itsm-label" style="left:16px;">Role</span>
                             </div>
+                            
                             <div class="itsm-input-wrapper mb-0 mt-5">
                                 <input type="text" id="newAdminTelegram" class="itsm-input pl-4" placeholder=" " autocomplete="off">
                                 <span class="itsm-label" style="left:16px;">Telegram Chat ID (Optional)</span>
@@ -516,7 +533,7 @@
                     </div>
                 </div>
 
-                <!-- Sub-tab: Platform Settings & Feature Flags (Script Boxes Removed) -->
+                <!-- Sub-tab: Platform Settings & Feature Flags -->
                 <div id="admTab-apps" class="hidden animate-fade-in max-w-5xl mx-auto">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         
@@ -539,7 +556,7 @@
                             <button onclick="savePlatformSettings()" class="w-full bg-blue-600 text-white py-4 rounded-full text-sm font-bold shadow-md hover:bg-blue-500 transition-colors active:scale-95">Save Settings to Database</button>
                         </div>
 
-                        <!-- Feature Flags Toggle Column (Scrollable Container Added) -->
+                        <!-- Feature Flags Toggle Column -->
                         <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white self-start">
                             <div class="flex items-center mb-6">
                                 <div class="w-14 h-14 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl mr-5 shadow-sm"><i class="fa-solid fa-toggle-on"></i></div>
