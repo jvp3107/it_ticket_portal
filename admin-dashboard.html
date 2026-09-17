@@ -150,13 +150,13 @@
             <div class="admin-nav-container mb-10 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
                 <button onclick="switchNocTab('all')" id="nocTab-all" class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-layer-group"></i> Global Queue</button>
                 <button onclick="switchNocTab('visits')" id="nocTab-visits" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-map-location-dot"></i> Field Visits</button>
+                <button onclick="switchNocTab('inventory')" id="nocTab-inventory" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-boxes-stacked"></i> Asset Inventory</button>
                 <button onclick="switchNocTab('analytics')" id="nocTab-analytics" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-chart-pie"></i> Analytics & Exports</button>
                 <button onclick="switchNocTab('admin')" id="nocTab-admin" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-users-gear"></i> Admin Management</button>
             </div>
 
             <!-- TAB: Global Queue View -->
             <div id="noc-allView" class="animate-fade-in">
-                
                 <!-- KPI Cards (6 Tiles) -->
                 <div class="grid grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
                     <div class="glass-panel p-6 rounded-[32px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-blue-50 border-blue-100 border cursor-pointer" onclick="setQuickFilter('All')">
@@ -245,6 +245,96 @@
                 </div>
             </div>
 
+            <!-- TAB: ASSET INVENTORY (NEW) -->
+            <div id="noc-inventoryView" class="hidden animate-fade-in max-w-6xl mx-auto">
+                <div class="mb-10 text-center">
+                    <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Asset & Hardware Inventory</h2>
+                    <p class="text-slate-500 mt-3 font-medium">Track client hardware, assign assets, and automate email handovers.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Add Inventory Form -->
+                    <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-indigo-500 bg-white">
+                        <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-laptop-medical text-indigo-600 mr-2"></i> Register Asset</h3>
+                        
+                        <form onsubmit="saveAsset(event)" class="space-y-4">
+                            <div class="itsm-input-wrapper mb-0">
+                                <input type="text" id="invAssetTag" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Asset ID / Tag *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="invCompany" required class="itsm-input appearance-none pl-4 cursor-pointer" onchange="filterInventoryUsers()"></select>
+                                <span class="itsm-label" style="left:16px;">Client Company *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="invAssignedUser" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="IT Stock">Unassigned (IT Stock)</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Assign To</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="invDeviceType" required class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="" disabled selected></option>
+                                    <option value="Laptop">Laptop</option>
+                                    <option value="Desktop">Desktop PC</option>
+                                    <option value="Monitor">Monitor</option>
+                                    <option value="Network Device">Network / Router</option>
+                                    <option value="Peripheral">Peripheral / Other</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Device Type *</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <input type="text" id="invBrandModel" required class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Brand & Model *</span>
+                            </div>
+
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <input type="text" id="invSerialNumber" class="itsm-input pl-4" placeholder=" " autocomplete="off">
+                                <span class="itsm-label" style="left:16px;">Serial / IMEI Number</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <select id="invStatus" class="itsm-input appearance-none pl-4 cursor-pointer">
+                                    <option value="Active" selected>Active</option>
+                                    <option value="In Repair">In Repair</option>
+                                    <option value="Retired">Retired / Deprecated</option>
+                                </select>
+                                <span class="itsm-label" style="left:16px;">Asset Status</span>
+                            </div>
+                            
+                            <div class="itsm-input-wrapper mb-0 mt-4">
+                                <textarea id="invNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea>
+                                <span class="itsm-label" style="left:16px;">Notes / Specs</span>
+                            </div>
+                            
+                            <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+                                <button type="submit" id="btnSaveAsset" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-full shadow-md hover:-translate-y-1 hover:bg-indigo-500 transition-all text-sm">Save & Send Handover Alert</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Inventory List -->
+                    <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 flex flex-col h-full shadow-md bg-white">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
+                            <h3 class="font-black text-slate-800 text-xl whitespace-nowrap"><i class="fa-solid fa-boxes-stacked text-blue-600 mr-2"></i> Company Inventory</h3>
+                            <div class="flex gap-3 w-full md:w-auto justify-end items-center">
+                                <select id="inventoryCompanyFilter" onchange="renderInventory()" class="px-5 py-2.5 bg-white border border-slate-300 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-sm">
+                                    <option value="All">All Companies</option>
+                                </select>
+                                <button onclick="fetchInventory()" class="bg-white border border-slate-300 text-slate-600 px-4 py-2.5 rounded-full text-xs font-bold hover:bg-slate-50 transition active:scale-95 shadow-sm"><i class="fa-solid fa-rotate"></i></button>
+                            </div>
+                        </div>
+                        <div id="inventoryContainer" class="space-y-4 overflow-y-auto flex-grow pr-2" style="max-height: 600px;">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- TAB: FIELD VISITS & LOCATIONS -->
             <div id="noc-visitsView" class="hidden animate-fade-in max-w-6xl mx-auto">
                 <div class="mb-10 text-center">
@@ -253,7 +343,7 @@
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Add Visit Form -->
+                    <!-- Add Visit Form (Strict DB Schema Match) -->
                     <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-emerald-500 bg-white">
                         <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-location-dot text-emerald-600 mr-2"></i> Schedule / Log Visit</h3>
                         
@@ -268,7 +358,7 @@
                                 <span class="itsm-label" style="left:16px;">Client Company *</span>
                             </div>
                             
-                            <div class="itsm-input-wrapper mb-0 relative">
+                            <div class="itsm-input-wrapper mb-0 relative mt-4">
                                 <input type="text" id="visitAddress" required class="itsm-input pl-4 pr-12" placeholder=" " autocomplete="off">
                                 <span class="itsm-label" style="left:16px;">Address Location *</span>
                                 <button type="button" onclick="getLocation()" class="absolute right-3 top-4 text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-lg transition" title="Get GPS Coordinates"><i class="fa-solid fa-location-crosshairs"></i></button>
