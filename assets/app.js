@@ -1,6 +1,6 @@
 /**
  * GLOBAL CONFIGURATION & ROUTING ENGINE
- * Spread Technical ITSM (Strict Android DB Schema Compliance + 1899 Date Fix)
+ * Spread Technical ITSM (Inventory Management & Email Automation Add-on)
  */
 const DB_CONFIG = {
     ticketApiUrl: "https://script.google.com/macros/s/AKfycbzUtwju4tELvUTYBlVCWYTFp5LZ7cCkNbhWFzy081HHhABPPLzFUS4xjjBvhIO699wS/exec",
@@ -19,6 +19,7 @@ let IT_NAME = "";
 let globalUsersList = [];
 let globalRegisteredCompanies = [];
 let globalVisits = [];
+let globalInventory = [];
 let currentCompanyFilter = "All";
 let monthlyChartInstance = null;
 let chartDataExport = [];
@@ -42,14 +43,14 @@ async function apiPost(payload) {
     const userActions = [
         "save_user", "register_client", "register_it_staff", "update_user_profile",
         "get_users", "login_admin", "login_client", "delete_user", "reset_password",
-        "get_companies", "save_company", "delete_company"
+        "get_companies", "save_company", "delete_company", "save_company_asset"
     ];
     let targetUrl = DB_CONFIG.ticketApiUrl;
 
     if (userActions.includes(payload.action)) {
         targetUrl = DB_CONFIG.userApiUrl;
     } else if (payload.action === 'db_read' || payload.action === 'db_upsert' || payload.action === 'db_delete') {
-        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings') {
+        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings' || payload.target_sheet === 'Inventory') {
             targetUrl = DB_CONFIG.userApiUrl;
         }
     }
@@ -77,27 +78,18 @@ function getSLAString(startDateStr, priority, status) {
     return `<span class="text-emerald-600 font-bold font-mono text-xs">${hrs}h ${mins}m left</span>`;
 }
 
-// FIX: Smartly merge Google Sheets 1899 Time quirk with the actual visit date
 function formatSheetDateTime(dateStr, timeStr) {
     if (!timeStr) return null;
     let t = new Date(timeStr);
-    if (isNaN(t)) return timeStr; // Fallback to raw text if parsing fails
-
-    // If year is valid (> 1970), just format the timeStr directly
+    if (isNaN(t)) return timeStr; 
     if (t.getFullYear() > 1970) {
         return t.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     }
-
-    // Otherwise, extract JUST the time part from the 1899 date
     let timePart = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-    // Look at the base date string to get the Month/Day/Year
     let d = new Date(dateStr);
     if (!dateStr || isNaN(d) || d.getFullYear() <= 1970) {
-        return timePart; // Just return the time if no valid date exists
+        return timePart;
     }
-
-    // Combine Date and Time
     let datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${datePart}, ${timePart}`;
 }
@@ -264,7 +256,7 @@ function renderFeatureFlagsAdminUI() {
 
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
         return;
     }
 
@@ -404,7 +396,7 @@ async function handleITLogin(e) {
 // TAB SWITCHING (DASHBOARDS)
 // ==========================================
 function switchNocTab(tab) {
-    ['all', 'visits', 'analytics', 'admin'].forEach(t => {
+    ['all', 'visits', 'inventory', 'analytics', 'admin'].forEach(t => {
         const viewEl = document.getElementById(`noc-${t}View`); const btnEl = document.getElementById(`nocTab-${t}`);
         if (viewEl) viewEl.classList.add('hidden');
         if (btnEl) { btnEl.classList.remove('ent-tab-active'); btnEl.classList.add('ent-tab-inactive'); }
@@ -412,9 +404,11 @@ function switchNocTab(tab) {
     const activeView = document.getElementById(`noc-${tab}View`); const activeBtn = document.getElementById(`nocTab-${tab}`);
     if (activeView) activeView.classList.remove('hidden');
     if (activeBtn) { activeBtn.classList.remove('ent-tab-inactive'); activeBtn.classList.add('ent-tab-active'); }
+    
     if (tab === 'analytics') renderCompanyGrid();
     if (tab === 'admin') { fetchUsersList(); loadPlatformSettings(); }
     if (tab === 'visits') { fetchUsersList().then(() => populateVisitCompanies()); fetchVisits(); }
+    if (tab === 'inventory') { fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); }); }
 }
 
 function switchAdminTab(subTab) {
@@ -444,7 +438,7 @@ function switchClientTicketTab(tab) {
 }
 
 // ==========================================
-// TICKET MODAL & CHAT ENGINE (OPTIMIZED)
+// TICKET MODAL & CHAT ENGINE
 // ==========================================
 function openTicketModal(ticketId) {
     const ticket = nocDashboardTickets.find(t => t.id === ticketId); if (!ticket) return;
@@ -482,7 +476,7 @@ function openTicketModal(ticketId) {
     document.getElementById('modalAssignDate').innerText = ticket.assigned_date ? 'Assigned: ' + escapeHTML(ticket.assigned_date) : 'Awaiting dispatch';
 
     if (activeChatTimer) clearInterval(activeChatTimer);
-    activeChatTimer = setInterval(() => { refreshJustTheChat(ticketId); }, 4000); // Throttled to 4s for performance
+    activeChatTimer = setInterval(() => { refreshJustTheChat(ticketId); }, 4000);
     refreshJustTheChat(ticketId);
 
     const modal = document.getElementById('ticketModalOverlay');
@@ -534,11 +528,11 @@ async function postModalChatMessage() {
 }
 
 // ==========================================
-// CLIENT DASHBOARD ENGINE (OPTIMIZED)
+// CLIENT DASHBOARD ENGINE
 // ==========================================
 function startClientPolling() {
     if (clientPollingTimer) clearInterval(clientPollingTimer);
-    clientPollingTimer = setInterval(refreshClientDashboardSilently, 4000); // Optimized to 4s
+    clientPollingTimer = setInterval(refreshClientDashboardSilently, 4000);
 }
 
 function stopClientPolling() {
@@ -694,7 +688,7 @@ async function managerApproveReject(ticketId, newStatus) {
 // ==========================================
 function startNocPolling() {
     if (nocPollingTimer) clearInterval(nocPollingTimer);
-    nocPollingTimer = setInterval(refreshNOCDashboardSilently, 4000); // Throttled to 4s for zero laptop lag
+    nocPollingTimer = setInterval(refreshNOCDashboardSilently, 4000); 
 }
 
 function stopNocPolling() {
@@ -860,7 +854,126 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// FIELD VISITS ENGINE (STRICT SCHEMA MATCH)
+// ASSET INVENTORY ENGINE (NEW)
+// ==========================================
+function populateInventoryCompanies() {
+    const compSelect = document.getElementById('invCompany');
+    if (compSelect && globalRegisteredCompanies.length > 0) {
+        let html = '<option value="" disabled selected>Select Company</option>';
+        globalRegisteredCompanies.forEach(c => { const cName = escapeHTML(c.company || c["company name"] || c.name); html += `<option value="${cName}">${cName}</option>`; });
+        compSelect.innerHTML = html;
+        
+        const filterSelect = document.getElementById('inventoryCompanyFilter');
+        if (filterSelect) {
+            filterSelect.innerHTML = '<option value="All">All Companies</option>' + html.replace('<option value="" disabled selected>Select Company</option>', '');
+        }
+    }
+}
+
+function filterInventoryUsers() {
+    const selectedComp = document.getElementById('invCompany').value;
+    const userSelect = document.getElementById('invAssignedUser');
+    let opts = `<option value="IT Stock">Unassigned (IT Stock)</option>`;
+    
+    if (selectedComp) {
+        const users = globalUsersList.filter(u => u.company === selectedComp);
+        users.forEach(u => { opts += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)} (${escapeHTML(u.email)})</option>`; });
+    }
+    userSelect.innerHTML = opts;
+}
+
+async function fetchInventory() {
+    try {
+        const res = await apiPost({ action: 'db_read', target_sheet: 'Inventory' }); 
+        const data = await res.json();
+        globalInventory = data.data || []; 
+        renderInventory();
+    } catch (e) { }
+}
+
+function renderInventory() {
+    const container = document.getElementById('inventoryContainer'); 
+    if (!container) return;
+    
+    const companyFilter = document.getElementById('inventoryCompanyFilter')?.value || 'All';
+    let filtered = globalInventory.filter(i => companyFilter === 'All' || i.company === companyFilter);
+
+    if (filtered.length === 0) { 
+        container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No assets registered.</p>'; 
+        return; 
+    }
+
+    let html = '';
+    filtered.forEach(item => {
+        let statColor = item.status === 'Active' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : item.status === 'In Repair' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200';
+        
+        html += `
+        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <h4 class="font-black text-sm text-slate-800 flex items-center gap-2">
+                    ${escapeHTML(item.brand_model)} 
+                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">${escapeHTML(item.device_type)}</span>
+                </h4>
+                <span class="text-[10px] text-slate-500 font-bold whitespace-nowrap bg-slate-100 px-2 py-0.5 rounded shadow-sm border border-slate-200">${escapeHTML(item.asset_tag)}</span>
+            </div>
+            
+            <div class="text-xs text-slate-600 font-medium space-y-1">
+                <p><i class="fa-solid fa-building w-4 text-center text-slate-400"></i> ${escapeHTML(item.company)}</p>
+                <p><i class="fa-solid fa-user w-4 text-center text-slate-400"></i> Assigned: <span class="font-bold text-blue-600">${escapeHTML(item.assigned_to)}</span></p>
+                <p><i class="fa-solid fa-barcode w-4 text-center text-slate-400"></i> SN: ${escapeHTML(item.serial_number || 'N/A')}</p>
+            </div>
+
+            ${item.notes ? `<p class="text-[10px] text-slate-500 italic mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100">${escapeHTML(item.notes)}</p>` : ''}
+
+            <div class="mt-2 pt-3 border-t border-slate-100 flex justify-between items-center">
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${escapeHTML(item.status)}</span>
+                <button onclick="deleteAsset('${item.asset_tag}')" class="text-rose-400 hover:text-rose-600 transition text-xs" title="Delete Asset"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+async function saveAsset(e) {
+    e.preventDefault(); 
+    const btn = document.getElementById('btnSaveAsset'); 
+    btn.innerHTML = "Saving & Emailing..."; btn.disabled = true;
+
+    // We use a custom 'save_company_asset' action to trigger the App Script email.
+    const payload = {
+        action: 'save_company_asset', 
+        asset_tag: document.getElementById('invAssetTag').value.trim(),
+        company: document.getElementById('invCompany').value,
+        assigned_to: document.getElementById('invAssignedUser').value,
+        device_type: document.getElementById('invDeviceType').value,
+        brand_model: document.getElementById('invBrandModel').value.trim(),
+        serial_number: document.getElementById('invSerialNumber').value.trim(),
+        status: document.getElementById('invStatus').value,
+        notes: document.getElementById('invNotes').value.trim()
+    };
+
+    try { 
+        await apiPost(payload); 
+        document.getElementById('invAssetTag').value = '';
+        document.getElementById('invBrandModel').value = '';
+        document.getElementById('invSerialNumber').value = '';
+        document.getElementById('invNotes').value = '';
+        document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
+        
+        fetchInventory(); 
+        alert("Asset saved! Handover email sent to the assigned user."); 
+    } catch (e) { alert("Network error saving asset."); }
+    btn.innerHTML = "Save & Send Handover Alert"; btn.disabled = false;
+}
+
+async function deleteAsset(assetTag) {
+    if (!confirm(`Delete asset ${assetTag} permanently?`)) return;
+    try { await apiPost({ action: 'db_delete', target_sheet: 'Inventory', primary_key: 'asset_tag', primary_value: assetTag }); fetchInventory(); } 
+    catch (e) { alert("Error deleting asset."); }
+}
+
+// ==========================================
+// FIELD VISITS ENGINE
 // ==========================================
 function populateVisitCompanies() {
     const compSelect = document.getElementById('visitCompany');
@@ -900,31 +1013,51 @@ function renderVisits() {
     const container = document.getElementById('visitLogsContainer'); if (!container) return;
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
-    let sorted = [...globalVisits].sort((a, b) => {
-        let dA = parseSheetDate(a.time_in || a.date, a.date) || new Date(0);
-        let dB = parseSheetDate(b.time_in || b.date, b.date) || new Date(0);
-        return dB - dA;
-    });
+    const getSortValue = (v) => {
+        let d1 = new Date(v.date || 0);
+        let d2 = new Date(v.time_in || 0);
+        return (d2.getFullYear() > 1970) ? d2.getTime() : d1.getTime();
+    };
+
+    let sorted = [...globalVisits].sort((a, b) => getSortValue(b) - getSortValue(a));
 
     let html = '';
     sorted.forEach(v => {
-        let isCompleted = (v.time_out && v.time_out.trim() !== "");
-        let statColor = isCompleted ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
-        let statusText = isCompleted ? 'Completed' : 'Ongoing';
+        let dbStatus = v.status || '';
+        let isCompleted = (dbStatus.toLowerCase() === 'completed') || (v.time_out && String(v.time_out).trim() !== "");
+        let isCancelled = (dbStatus.toLowerCase() === 'cancelled');
+        let statusText = dbStatus || (isCompleted ? "Completed" : "Ongoing");
+        
+        let statColor = 'text-amber-700 bg-amber-50 border-amber-200';
+        if (isCompleted) statColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (isCancelled) statColor = 'text-rose-700 bg-rose-50 border-rose-200';
         
         let mapLink = v.latitude && v.longitude 
             ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        let dIn = parseSheetDate(v.time_in || v.date, v.date);
-        let dOut = parseSheetDate(v.time_out, v.date);
-        let dSchedule = parseSheetDate(v.date, v.date);
+        let inDisplay = formatSheetDateTime(v.date, v.time_in) || "Not Started";
+        let exitDisplay = formatSheetDateTime(v.date, v.time_out) || "Pending";
+        
+        let scheduleDisplay = v.date ? new Date(v.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
 
-        let inDisplay = dIn ? dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "No Entry Time";
-        let exitDisplay = dOut ? dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "Pending";
-        let scheduleDisplay = dSchedule ? dSchedule.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
-
-        let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
+        let durationDisplay;
+        if (v.duration && String(v.duration).trim() !== "") {
+            durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>`;
+        } else if (v.time_in && v.time_out) {
+            let dIn = new Date(v.time_in);
+            let dOut = new Date(v.time_out);
+            if (!isNaN(dIn) && !isNaN(dOut)) {
+                let diffMs = dOut - dIn;
+                if (diffMs >= 0) {
+                    let hrs = Math.floor(diffMs / (1000 * 60 * 60));
+                    let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                    durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${hrs}h ${mins}m</span>`;
+                } else { durationDisplay = '<span class="text-rose-500 font-bold">Time Error</span>'; }
+            }
+        } else {
+            durationDisplay = isCompleted ? '<span class="text-slate-400 font-medium">N/A</span>' : '<span class="text-slate-400 font-medium">Ongoing</span>';
+        }
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
