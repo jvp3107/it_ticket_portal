@@ -264,7 +264,7 @@ function renderFeatureFlagsAdminUI() {
 
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
         return;
     }
 
@@ -806,7 +806,8 @@ function filterDashboard() {
 
     let htmlStr = '';
     filtered.forEach(t => {
-        const isPending = (t.status === 'Pending Approval'); const canApprove = (IT_ROLE === 'Master Admin' || IT_ROLE === 'Approver');
+        const isPending = (t.status === 'Pending Approval'); 
+        const canApprove = (['Master Admin', 'Super Admin', 'System Admin', 'Approver'].includes(IT_ROLE));
         let selectHTML = `<select onchange="updateAdminTicketStatus('${t.id}', this.value)" class="p-2 border border-slate-300 rounded-lg text-[11px] font-bold bg-white text-slate-800 w-full outline-none cursor-pointer shadow-sm" ${isPending && !canApprove ? 'disabled' : ''}>`;
         STATUS_FLOW.forEach(s => { selectHTML += `<option value="${s}" ${t.status === s ? 'selected' : ''}>${s}</option>`; }); selectHTML += `</select>`;
 
@@ -814,9 +815,13 @@ function filterDashboard() {
 
         let assignSelect = "";
         if (t.status !== 'Resolved') {
-            if (IT_ROLE === 'Master Admin') {
+            if (['Master Admin', 'Super Admin', 'System Admin'].includes(IT_ROLE)) {
                 assignSelect = `<select onchange="assignTicketToUser('${t.id}', this.value)" class="mt-2 p-1.5 w-full bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-700 outline-none cursor-pointer"><option value="" ${(!t.assigned_to || t.assigned_to === "") ? "selected" : ""}>Unassigned</option>`;
-                globalUsersList.forEach(u => { if (u.role === 'Master Admin' || u.role === 'Tier 1 Support') { assignSelect += `<option value="${escapeHTML(u.name)}" ${(t.assigned_to === u.name) ? 'selected' : ''}>${escapeHTML(u.name)}</option>`; } });
+                globalUsersList.forEach(u => { 
+                    if (['Tier 1 Support', 'Tier 2 Support', 'System Admin', 'Master Admin', 'Super Admin'].includes(u.role)) { 
+                        assignSelect += `<option value="${escapeHTML(u.name)}" ${(t.assigned_to === u.name) ? 'selected' : ''}>${escapeHTML(u.name)}</option>`; 
+                    } 
+                });
                 assignSelect += `</select>`;
             } else {
                 if (!t.assigned_to || t.assigned_to === "") { assignSelect = `<button onclick="assignTicketToUser('${t.id}', '${IT_NAME}')" class="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500 transition block mt-2 w-full text-center shadow-md active:scale-95">Assign to Me</button>`; }
@@ -835,7 +840,7 @@ function filterDashboard() {
                 <td class="px-5 py-5 align-top"><button onclick="openTicketModal('${t.id}')" class="font-black text-blue-600 hover:underline text-sm block mb-1 text-left">${t.id}</button><span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">${displayDate}</span></td>
                 <td class="px-6 py-5 align-top w-36">${slaBadge}</td>
                 <td class="px-6 py-5 align-top text-sm"><strong class="block text-slate-800 mb-1 truncate max-w-sm">${escapeHTML(t.subject)}</strong><span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${escapeHTML(t.company)}</span><span class="text-[10px] text-slate-400 ml-1">| ${escapeHTML(t.name)}</span>${attachBadge}${remoteBadge}</td>
-                <td class="px-6 py-5 align-top w-40">${selectHTML}<div class="flex justify-between mt-3 gap-2"><button onclick="openTicketModal('${t.id}')" class="w-full text-[10px] bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 py-1.5 rounded-lg font-bold transition">Open View</button>${IT_ROLE === 'Master Admin' ? `<button onclick="deleteTicket('${t.id}')" class="w-10 flex items-center justify-center text-[10px] bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-1.5 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>` : ''}</div></td>
+                <td class="px-6 py-5 align-top w-40">${selectHTML}<div class="flex justify-between mt-3 gap-2"><button onclick="openTicketModal('${t.id}')" class="w-full text-[10px] bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 py-1.5 rounded-lg font-bold transition">Open View</button>${['Master Admin', 'Super Admin', 'System Admin'].includes(IT_ROLE) ? `<button onclick="deleteTicket('${t.id}')" class="w-10 flex items-center justify-center text-[10px] bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-1.5 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>` : ''}</div></td>
             </tr>`;
     });
     tbody.innerHTML = htmlStr;
@@ -895,51 +900,31 @@ function renderVisits() {
     const container = document.getElementById('visitLogsContainer'); if (!container) return;
     if (globalVisits.length === 0) { container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No visits recorded.</p>'; return; }
 
-    const getSortValue = (v) => {
-        let d1 = new Date(v.date || 0);
-        let d2 = new Date(v.time_in || 0);
-        return (d2.getFullYear() > 1970) ? d2.getTime() : d1.getTime();
-    };
-
-    let sorted = [...globalVisits].sort((a, b) => getSortValue(b) - getSortValue(a));
+    let sorted = [...globalVisits].sort((a, b) => {
+        let dA = parseSheetDate(a.time_in || a.date, a.date) || new Date(0);
+        let dB = parseSheetDate(b.time_in || b.date, b.date) || new Date(0);
+        return dB - dA;
+    });
 
     let html = '';
     sorted.forEach(v => {
-        let dbStatus = v.status || '';
-        let isCompleted = (dbStatus.toLowerCase() === 'completed') || (v.time_out && String(v.time_out).trim() !== "");
-        let isCancelled = (dbStatus.toLowerCase() === 'cancelled');
-        let statusText = dbStatus || (isCompleted ? "Completed" : "Ongoing");
-        
-        let statColor = 'text-amber-700 bg-amber-50 border-amber-200';
-        if (isCompleted) statColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        if (isCancelled) statColor = 'text-rose-700 bg-rose-50 border-rose-200';
+        let isCompleted = (v.time_out && v.time_out.trim() !== "");
+        let statColor = isCompleted ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+        let statusText = isCompleted ? 'Completed' : 'Ongoing';
         
         let mapLink = v.latitude && v.longitude 
             ? `https://www.google.com/maps/search/?api=1&query=${v.latitude},${v.longitude}`
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address || v.company)}`;
 
-        let inDisplay = formatSheetDateTime(v.date, v.time_in) || "Not Started";
-        let exitDisplay = formatSheetDateTime(v.date, v.time_out) || "Pending";
-        
-        let scheduleDisplay = v.date ? new Date(v.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
+        let dIn = parseSheetDate(v.time_in || v.date, v.date);
+        let dOut = parseSheetDate(v.time_out, v.date);
+        let dSchedule = parseSheetDate(v.date, v.date);
 
-        let durationDisplay;
-        if (v.duration && String(v.duration).trim() !== "") {
-            durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>`;
-        } else if (v.time_in && v.time_out) {
-            let dIn = new Date(v.time_in);
-            let dOut = new Date(v.time_out);
-            if (!isNaN(dIn) && !isNaN(dOut)) {
-                let diffMs = dOut - dIn;
-                if (diffMs >= 0) {
-                    let hrs = Math.floor(diffMs / (1000 * 60 * 60));
-                    let mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                    durationDisplay = `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${hrs}h ${mins}m</span>`;
-                } else { durationDisplay = '<span class="text-rose-500 font-bold">Time Error</span>'; }
-            }
-        } else {
-            durationDisplay = isCompleted ? '<span class="text-slate-400 font-medium">N/A</span>' : '<span class="text-slate-400 font-medium">Ongoing</span>';
-        }
+        let inDisplay = dIn ? dIn.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "No Entry Time";
+        let exitDisplay = dOut ? dOut.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : "Pending";
+        let scheduleDisplay = dSchedule ? dSchedule.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "No Schedule Date";
+
+        let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
         <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
