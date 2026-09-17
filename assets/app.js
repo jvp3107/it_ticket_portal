@@ -424,13 +424,21 @@ function switchNocTab(tab) {
 
 function switchAdminTab(subTab) {
     ['corp', 'companies', 'it', 'apps'].forEach(t => {
-        const viewEl = document.getElementById(`admTab-${t}`); const btnEl = document.getElementById(`admTabBtn-${t}`);
+        const viewEl = document.getElementById(`admTab-${t}`); 
+        const btnEl = document.getElementById(`admTabBtn-${t}`);
         if (viewEl) viewEl.classList.add('hidden');
-        if (btnEl) { btnEl.classList.remove('bg-blue-600', 'text-white', 'border-blue-500/30', 'border'); btnEl.classList.add('glass-surface', 'text-slate-600', 'border-transparent', 'border'); }
+        if (btnEl) { 
+            btnEl.classList.remove('ent-tab-active'); 
+            btnEl.classList.add('ent-tab-inactive'); 
+        }
     });
-    const activeView = document.getElementById(`admTab-${subTab}`); const activeBtn = document.getElementById(`admTabBtn-${subTab}`);
+    const activeView = document.getElementById(`admTab-${subTab}`); 
+    const activeBtn = document.getElementById(`admTabBtn-${subTab}`);
     if (activeView) activeView.classList.remove('hidden');
-    if (activeBtn) { activeBtn.classList.remove('glass-surface', 'text-slate-600', 'border-transparent'); activeBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-500/30'); }
+    if (activeBtn) { 
+        activeBtn.classList.remove('ent-tab-inactive'); 
+        activeBtn.classList.add('ent-tab-active'); 
+    }
     if (subTab === 'companies') renderRegisteredCompanies();
 }
 
@@ -864,9 +872,52 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
     try { await apiPost({ action: 'update', id: ticketId, status: newStatus, resolve_description: escapeHTML(rca) }); fetchDashboardTickets(); } catch (e) { }
 }
 
+
 // ==========================================
-// ASSET INVENTORY ENGINE (UPDATED WITH SPECS)
+// ASSET INVENTORY ENGINE (ENTERPRISE SPECS)
 // ==========================================
+
+function updateProcessorModels() {
+    const brand = document.getElementById('invProcessorBrand').value;
+    const modelSelect = document.getElementById('invProcessorType');
+    
+    let html = '<option value="" disabled selected>Select Model</option>';
+    
+    if (brand === 'Intel') {
+        html += `<optgroup label="Intel Core Ultra">
+                    <option value="Core Ultra 9">Core Ultra 9</option>
+                    <option value="Core Ultra 7">Core Ultra 7</option>
+                    <option value="Core Ultra 5">Core Ultra 5</option>
+                 </optgroup>
+                 <optgroup label="Intel Core (Legacy)">
+                    <option value="Core i9">Core i9</option>
+                    <option value="Core i7">Core i7</option>
+                    <option value="Core i5">Core i5</option>
+                    <option value="Core i3">Core i3</option>
+                    <option value="Xeon">Xeon (Workstation)</option>
+                 </optgroup>`;
+    } else if (brand === 'AMD') {
+        html += `<optgroup label="Ryzen Series">
+                    <option value="Ryzen 9">Ryzen 9</option>
+                    <option value="Ryzen 7">Ryzen 7</option>
+                    <option value="Ryzen 5">Ryzen 5</option>
+                    <option value="Ryzen 3">Ryzen 3</option>
+                 </optgroup>
+                 <optgroup label="Pro/Workstation">
+                    <option value="Threadripper">Threadripper</option>
+                    <option value="EPYC">EPYC</option>
+                 </optgroup>`;
+    } else if (brand === 'Apple') {
+        html += `<optgroup label="Apple Silicon">
+                    <option value="M3 Max / Pro">M3 Series</option>
+                    <option value="M2 Max / Pro">M2 Series</option>
+                    <option value="M1 Max / Pro">M1 Series</option>
+                 </optgroup>`;
+    }
+    
+    modelSelect.innerHTML = html;
+}
+
 function updateInventoryUserFilter() {
     const compFilter = document.getElementById('inventoryCompanyFilter').value;
     const userFilterSelect = document.getElementById('inventoryUserFilter');
@@ -935,7 +986,7 @@ function renderInventory() {
     );
 
     if (filtered.length === 0) { 
-        container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No assets found for this filter.</p>'; 
+        container.innerHTML = '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10 col-span-full">No assets found matching the current filters.</p>'; 
         return; 
     }
 
@@ -952,47 +1003,94 @@ function renderInventory() {
                 let specsRaw = parts[0].replace('[SPECS]', '').trim();
                 let notesRaw = parts[1] ? parts[1].trim() : '';
                 
-                specsDisplay = `<div class="mt-2 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-[10px] text-indigo-800 font-medium leading-relaxed shadow-inner"><i class="fa-solid fa-microchip mr-1"></i> ${escapeHTML(specsRaw)}</div>`;
+                // Convert | delimited specs to nice chips
+                let specChips = specsRaw.split('|').map(s => `<span class="inline-block px-1.5 py-0.5 bg-white rounded border border-indigo-100 text-indigo-700 whitespace-nowrap mb-1 mr-1">${escapeHTML(s.trim())}</span>`).join('');
+                
+                specsDisplay = `<div class="mt-3 bg-indigo-50/50 border border-indigo-100 rounded-lg p-2.5 text-[9px] font-bold shadow-inner leading-tight"><div class="text-indigo-400 mb-1 uppercase tracking-widest"><i class="fa-solid fa-microchip"></i> Hardware</div>${specChips}</div>`;
+                
                 if (notesRaw) {
-                    notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">${escapeHTML(notesRaw)}</p>`;
+                    notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100 leading-relaxed">${escapeHTML(notesRaw)}</p>`;
                 }
             } else {
-                notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">${escapeHTML(item.notes)}</p>`;
+                notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">${escapeHTML(item.notes)}</p>`;
             }
         }
         
         html += `
-        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
+        <div class="p-6 bg-white border border-slate-200 rounded-[24px] flex flex-col hover:shadow-lg transition-all gap-3 relative overflow-hidden group">
             <div class="flex justify-between items-start">
-                <h4 class="font-black text-sm text-slate-800 flex items-center gap-2">
+                <h4 class="font-black text-base text-slate-800 flex items-center gap-2">
                     ${escapeHTML(item.brand_model)} 
-                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">${escapeHTML(item.device_type)}</span>
                 </h4>
-                <span class="text-[10px] text-slate-500 font-bold whitespace-nowrap bg-slate-100 px-2 py-0.5 rounded shadow-sm border border-slate-200">${escapeHTML(item.asset_tag)}</span>
+                <span class="text-[10px] text-slate-600 font-bold whitespace-nowrap bg-slate-100 px-2.5 py-1 rounded shadow-sm border border-slate-200">${escapeHTML(item.asset_tag)}</span>
             </div>
             
-            <div class="text-xs text-slate-600 font-medium space-y-1">
-                <p><i class="fa-solid fa-building w-4 text-center text-slate-400"></i> ${escapeHTML(item.company)}</p>
-                <p><i class="fa-solid fa-user w-4 text-center text-slate-400"></i> Assigned: <span class="font-bold text-blue-600">${escapeHTML(item.assigned_to)}</span></p>
-                <p><i class="fa-solid fa-barcode w-4 text-center text-slate-400"></i> SN: ${escapeHTML(item.serial_number || 'N/A')}</p>
+            <div class="flex flex-wrap gap-2">
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold border text-indigo-700 bg-indigo-50 border-indigo-200 uppercase tracking-widest">${escapeHTML(item.device_type)}</span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor} uppercase tracking-widest">${escapeHTML(item.status)}</span>
+            </div>
+            
+            <div class="text-xs text-slate-600 font-medium space-y-1.5 mt-1 border-t border-slate-100 pt-3">
+                <p class="flex items-center"><i class="fa-solid fa-building w-5 text-slate-400"></i> ${escapeHTML(item.company)}</p>
+                <p class="flex items-center"><i class="fa-solid fa-user w-5 text-slate-400"></i> <span class="font-bold text-blue-600">${escapeHTML(item.assigned_to)}</span></p>
+                <p class="flex items-center text-[10px] text-slate-500 mt-1"><i class="fa-solid fa-barcode w-5 text-slate-300"></i> SN: ${escapeHTML(item.serial_number || 'N/A')}</p>
             </div>
 
             ${specsDisplay}
             ${notesDisplay}
 
-            <div class="mt-2 pt-3 border-t border-slate-100 flex justify-between items-center">
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor}">${escapeHTML(item.status)}</span>
-                <button onclick="deleteAsset('${item.asset_tag}')" class="text-rose-400 hover:text-rose-600 transition text-xs" title="Delete Asset"><i class="fa-solid fa-trash"></i></button>
-            </div>
+            <button onclick="deleteAsset('${item.asset_tag}')" class="absolute bottom-4 right-4 text-rose-300 hover:text-rose-600 transition text-sm opacity-0 group-hover:opacity-100" title="Delete Asset"><i class="fa-solid fa-trash"></i></button>
         </div>`;
     });
     container.innerHTML = html;
 }
 
+function exportInventoryExcel() {
+    if (globalInventory.length === 0) return alert("No inventory data to export.");
+    
+    const companyFilter = document.getElementById('inventoryCompanyFilter')?.value || 'All';
+    const userFilter = document.getElementById('inventoryUserFilter')?.value || 'All';
+    
+    let filtered = globalInventory.filter(i => 
+        (companyFilter === 'All' || i.company === companyFilter) &&
+        (userFilter === 'All' || i.assigned_to === userFilter)
+    );
+
+    if (filtered.length === 0) return alert("No data matches the current filters.");
+
+    const cleanData = filtered.map(item => {
+        let cleanSpecs = "N/A";
+        let cleanNotes = item.notes || "";
+        
+        if (item.notes && item.notes.includes('[SPECS]')) {
+            let parts = item.notes.split('[NOTES]');
+            cleanSpecs = parts[0].replace('[SPECS]', '').replace(/\|/g, ', ').trim();
+            cleanNotes = parts[1] ? parts[1].trim() : '';
+        }
+
+        return {
+            "Asset Tag": item.asset_tag,
+            "Client Company": item.company,
+            "Assigned User": item.assigned_to,
+            "Device Type": item.device_type,
+            "Brand & Model": item.brand_model,
+            "Serial Number": item.serial_number,
+            "Hardware Specs": cleanSpecs,
+            "Status": item.status,
+            "Additional Notes": cleanNotes
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(cleanData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Asset Inventory");
+    XLSX.writeFile(wb, "SpreadIT_Asset_Inventory.xlsx");
+}
+
 async function saveAsset(e) {
     e.preventDefault(); 
     const btn = document.getElementById('btnSaveAsset'); 
-    btn.innerHTML = "Saving & Emailing..."; btn.disabled = true;
+    btn.innerHTML = "Provisioning..."; btn.disabled = true;
 
     const companyName = document.getElementById('invCompany').value;
     const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
@@ -1005,8 +1103,15 @@ async function saveAsset(e) {
     const pType = document.getElementById('invProcessorType').value || '';
     const ram = document.getElementById('invRAM').value || '';
     const ramType = document.getElementById('invRAMType').value || '';
-    const sCap = document.getElementById('invStorageCap').value || '';
-    const sType = document.getElementById('invStorageType').value || '';
+    
+    // Primary Storage
+    const pCap = document.getElementById('invPrimaryStorageCap').value || '';
+    const pTypeStore = document.getElementById('invPrimaryStorageType').value || '';
+    
+    // Secondary Storage
+    const sCap = document.getElementById('invSecondaryStorageCap').value || '';
+    const sTypeStore = document.getElementById('invSecondaryStorageType') ? document.getElementById('invSecondaryStorageType').value : '';
+
     const gpu = document.getElementById('invGPU').value || '';
     const display = document.getElementById('invDisplay').value || '';
     
@@ -1015,7 +1120,10 @@ async function saveAsset(e) {
     let specsArr = [];
     if (pBrand || pType) specsArr.push(`CPU: ${pBrand} ${pType}`.trim());
     if (ram || ramType) specsArr.push(`RAM: ${ram} ${ramType}`.trim());
-    if (sCap || sType) specsArr.push(`Storage: ${sCap} ${sType}`.trim());
+    
+    if (pCap || pTypeStore) specsArr.push(`OS Drive: ${pCap} ${pTypeStore}`.trim());
+    if (sCap && sCap !== 'None') specsArr.push(`Data Drive: ${sCap} ${sTypeStore}`.trim());
+    
     if (gpu) specsArr.push(`GPU: ${gpu}`);
     if (display) specsArr.push(`Display: ${display}`);
     
@@ -1044,9 +1152,9 @@ async function saveAsset(e) {
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
         fetchInventory(); 
-        alert("Asset saved! Handover alert sent to the company administrator."); 
+        alert("Asset successfully provisioned in the directory."); 
     } catch (e) { alert("Network error saving asset."); }
-    btn.innerHTML = "Save Asset & Notify Admin"; btn.disabled = false;
+    btn.innerHTML = "Provision Asset"; btn.disabled = false;
 }
 
 async function deleteAsset(assetTag) {
