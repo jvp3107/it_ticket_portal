@@ -392,17 +392,6 @@ async function handleITLogin(e) {
     btn.innerHTML = "Login Admin"; btn.disabled = false;
 }
 
-async function resetITStaffPassword(email) {
-    const newPass = prompt(`Enter new password for ${email}:`);
-    if (!newPass) return;
-    try {
-        await apiPost({ action: 'reset_password', email: email, new_password: newPass, password: newPass });
-        alert("Password updated successfully!");
-    } catch(e) {
-        alert("Failed to reset password.");
-    }
-}
-
 // ==========================================
 // TAB SWITCHING (DASHBOARDS)
 // ==========================================
@@ -975,7 +964,6 @@ async function saveAsset(e) {
     const btn = document.getElementById('btnSaveAsset'); 
     btn.innerHTML = "Saving & Emailing..."; btn.disabled = true;
 
-    // Fetch the admin email for this specific company
     const companyName = document.getElementById('invCompany').value;
     const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
     const adminEmail = compObj ? (compObj.admin_email || '') : '';
@@ -1234,7 +1222,6 @@ function renderUsersList() {
         if (u.role !== 'Client' && u.role !== 'Approver') {
             let telegramBadge = u.telegram_id ? `<span class="px-2 py-0.5 ml-3 bg-blue-50 border border-blue-200 text-blue-600 rounded text-[9px] shadow-sm"><i class="fa-brands fa-telegram"></i> ${escapeHTML(u.telegram_id)}</span>` : '';
             itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span>
-            <button onclick="resetITStaffPassword('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 shadow-sm transition-all" title="Reset Password"><i class="fa-solid fa-key text-xs"></i></button>
             <button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
         }
     });
@@ -1314,6 +1301,11 @@ function updateManagerDropdown() {
 function openEditCorpUserModal(email, currentRole, currentManager, currentCompany, currentPhone) {
     document.getElementById('editCorpUserEmail').value = email; document.getElementById('editCorpUserRole').value = currentRole || 'Client'; document.getElementById('editCorpUserPhone').value = currentPhone || '';
     if (currentPhone) document.getElementById('editCorpUserPhone').classList.add('has-val'); else document.getElementById('editCorpUserPhone').classList.remove('has-val');
+    
+    // Clear password reset field
+    document.getElementById('editCorpUserPassword').value = '';
+    document.getElementById('editCorpUserPassword').classList.remove('has-val');
+
     const compSelect = document.getElementById('editCorpUserCompany'); let cOpts = `<option value="">Select Company</option>`;
     const compNames = globalRegisteredCompanies.map(c => c.company || c["company name"] || c.name);
     compNames.forEach(c => { cOpts += `<option value="${escapeHTML(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHTML(c)}</option>`; });
@@ -1336,16 +1328,38 @@ function populateEditManagerDropdown(companyName, currentManager, userEmail) {
 }
 
 async function saveCorpUserEdits(e) {
-    const email = document.getElementById('editCorpUserEmail').value; const role = document.getElementById('editCorpUserRole').value; const manager = document.getElementById('editCorpUserManager').value; const company = document.getElementById('editCorpUserCompany').value; const phone = document.getElementById('editCorpUserPhone').value;
+    const email = document.getElementById('editCorpUserEmail').value; 
+    const role = document.getElementById('editCorpUserRole').value; 
+    const manager = document.getElementById('editCorpUserManager').value; 
+    const company = document.getElementById('editCorpUserCompany').value; 
+    const phone = document.getElementById('editCorpUserPhone').value;
+    const newPass = document.getElementById('editCorpUserPassword').value.trim();
+
     const btn = e.target; btn.innerHTML = "Saving..."; btn.disabled = true;
-    try { await apiPost({ action: 'update_user_profile', email: email, role: role, manager: manager, company: company, phone: phone }); closeEditCorpUserModal(); fetchUsersList(); } catch (e) { alert("Error saving user."); }
+    try { 
+        if (newPass !== "") {
+            await apiPost({ action: 'reset_password', email: email, new_password: newPass, password: newPass });
+        }
+        await apiPost({ action: 'update_user_profile', email: email, role: role, manager: manager, company: company, phone: phone }); 
+        closeEditCorpUserModal(); 
+        fetchUsersList(); 
+    } catch (e) { alert("Error saving user."); }
     btn.innerHTML = "Save Changes"; btn.disabled = false;
 }
 
 function openEditITStaffModal(email, currentRole, currentPhone, currentTelegram) {
-    document.getElementById('editITStaffEmail').value = email; document.getElementById('editITStaffRole').value = currentRole || 'Tier 1 Support'; document.getElementById('editITStaffPhone').value = currentPhone || ''; document.getElementById('editITStaffTelegram').value = currentTelegram || '';
+    document.getElementById('editITStaffEmail').value = email; 
+    document.getElementById('editITStaffRole').value = currentRole || 'Tier 1 Support'; 
+    document.getElementById('editITStaffPhone').value = currentPhone || ''; 
+    document.getElementById('editITStaffTelegram').value = currentTelegram || '';
+    
+    // Clear password reset field when opening
+    document.getElementById('editITStaffPassword').value = '';
+    document.getElementById('editITStaffPassword').classList.remove('has-val');
+
     if (currentPhone) document.getElementById('editITStaffPhone').classList.add('has-val'); else document.getElementById('editITStaffPhone').classList.remove('has-val');
     if (currentTelegram) document.getElementById('editITStaffTelegram').classList.add('has-val'); else document.getElementById('editITStaffTelegram').classList.remove('has-val');
+    
     const modalBox = document.getElementById('editITStaffModalBox'); const modal = document.getElementById('editITStaffModal');
     modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalBox.classList.remove('scale-95'); }, 10);
 }
@@ -1356,9 +1370,21 @@ function closeEditITStaffModal() {
 }
 
 async function saveITStaffEdits(e) {
-    const email = document.getElementById('editITStaffEmail').value; const role = document.getElementById('editITStaffRole').value; const phone = document.getElementById('editITStaffPhone').value; const telegram_id = document.getElementById('editITStaffTelegram').value;
+    const email = document.getElementById('editITStaffEmail').value; 
+    const role = document.getElementById('editITStaffRole').value; 
+    const phone = document.getElementById('editITStaffPhone').value; 
+    const telegram_id = document.getElementById('editITStaffTelegram').value;
+    const newPass = document.getElementById('editITStaffPassword').value.trim();
+
     const btn = e.target; btn.innerHTML = "Updating..."; btn.disabled = true;
-    try { await apiPost({ action: 'update_user_profile', email: email, role: role, phone: phone, telegram_id: telegram_id }); closeEditITStaffModal(); fetchUsersList(); } catch (e) { alert("Error saving IT staff profile."); }
+    try { 
+        if (newPass !== "") {
+            await apiPost({ action: 'reset_password', email: email, new_password: newPass, password: newPass });
+        }
+        await apiPost({ action: 'update_user_profile', email: email, role: role, phone: phone, telegram_id: telegram_id }); 
+        closeEditITStaffModal(); 
+        fetchUsersList(); 
+    } catch (e) { alert("Error saving IT staff profile."); }
     btn.innerHTML = "Update Staff"; btn.disabled = false;
 }
 
