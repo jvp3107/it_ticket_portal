@@ -50,7 +50,7 @@ async function apiPost(payload) {
     if (userActions.includes(payload.action)) {
         targetUrl = DB_CONFIG.userApiUrl;
     } else if (payload.action === 'db_read' || payload.action === 'db_upsert' || payload.action === 'db_delete') {
-        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings' || payload.target_sheet === 'Inventory') {
+        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings' || payload.target_sheet === 'Inventory' || payload.target_sheet === 'Visits') {
             targetUrl = DB_CONFIG.userApiUrl;
         }
     }
@@ -78,20 +78,15 @@ function getSLAString(startDateStr, priority, status) {
     return `<span class="text-emerald-600 font-bold font-mono text-xs">${hrs}h ${mins}m left</span>`;
 }
 
-function formatSheetDateTime(dateStr, timeStr) {
-    if (!timeStr) return null;
-    let t = new Date(timeStr);
-    if (isNaN(t)) return timeStr; 
-    if (t.getFullYear() > 1970) {
-        return t.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-    }
-    let timePart = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+function parseSheetDate(dateStr, fallbackStr) {
+    if (!dateStr) return null;
     let d = new Date(dateStr);
-    if (!dateStr || isNaN(d) || d.getFullYear() <= 1970) {
-        return timePart;
+    if (!isNaN(d) && d.getFullYear() > 1970) return d;
+    if (fallbackStr) {
+        let fd = new Date(fallbackStr);
+        if (!isNaN(fd) && fd.getFullYear() > 1970) return fd;
     }
-    let datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${datePart}, ${timePart}`;
+    return null;
 }
 
 function validateSession() {
@@ -109,6 +104,9 @@ function validateSession() {
 }
 setInterval(validateSession, 60000);
 
+// ==========================================
+// ROUTING & INITIALIZATION
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
 
@@ -123,8 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
     validateSession();
 
     if (path.includes('client-dashboard.html') && !clientSession) goTo('client-login.html');
-    if (path.includes('admin-dashboard.html') && !IT_ROLE) goTo('admin-login.html');
+    if (path.includes('admin-') && !IT_ROLE) goTo('admin-login.html');
 
+    // Client Init
     if (document.getElementById('clientDashboardView')) {
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
         document.getElementById('clientWelcomeText').innerText = `Logged in as ${clientSession.email}`;
@@ -135,19 +134,43 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAppConfig();
     }
 
-    if (document.getElementById('nocDashboardView')) {
-        document.getElementById('nocTab-all').innerHTML = `<i class="fa-solid fa-layer-group"></i> Global Queue <span class="text-[10px] ml-2 font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">(${IT_NAME} | ${IT_ROLE})</span>`;
+    // Admin Multi-Page Init
+    if (document.querySelector('.admin-nav-container')) {
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
-        
-        // Fetch users and pre-load all dropdowns including Inventory
-        fetchUsersList().then(() => {
-            populateVisitCompanies();
-            populateInventoryCompanies();
-        });
-        
-        fetchDashboardTickets();
-        startNocPolling();
         fetchAppConfig();
+        
+        let currentTab = 'all';
+        if (path.includes('admin-visits.html')) currentTab = 'visits';
+        if (path.includes('admin-inventory.html')) currentTab = 'inventory';
+        if (path.includes('admin-analytics.html')) currentTab = 'analytics';
+        if (path.includes('admin-management.html')) currentTab = 'admin';
+        
+        document.querySelectorAll('.ent-tab-btn').forEach(b => {
+            b.classList.remove('ent-tab-active'); b.classList.add('ent-tab-inactive');
+        });
+        const activeBtn = document.getElementById(`nocTab-${currentTab}`);
+        if(activeBtn) {
+            activeBtn.classList.remove('ent-tab-inactive'); activeBtn.classList.add('ent-tab-active');
+        }
+
+        const queueTabBtn = document.getElementById('nocTab-all');
+        if(queueTabBtn) {
+            queueTabBtn.innerHTML = `<i class="fa-solid fa-layer-group"></i> Global Queue <span class="text-[10px] ml-2 font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">(${IT_NAME} | ${IT_ROLE})</span>`;
+        }
+
+        if (currentTab === 'all') {
+            fetchUsersList().then(() => populateVisitCompanies());
+            fetchDashboardTickets();
+            startNocPolling();
+        } else if (currentTab === 'inventory') {
+            fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); });
+        } else if (currentTab === 'visits') {
+            fetchUsersList().then(() => populateVisitCompanies()); fetchVisits();
+        } else if (currentTab === 'analytics') {
+            fetchDashboardTickets(); 
+        } else if (currentTab === 'admin') {
+            fetchUsersList(); 
+        }
     }
 });
 
@@ -262,7 +285,7 @@ function renderFeatureFlagsAdminUI() {
 
     const flags = appConfigData.filter(c => c.type === 'FeatureFlag');
     if (flags.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured in Settings sheet.</p>`;
+        container.innerHTML = `<p class="text-xs text-slate-500">No feature flags configured.</p>`;
         return;
     }
 
@@ -410,22 +433,19 @@ async function resetITStaffPassword(email) {
 }
 
 // ==========================================
-// TAB SWITCHING (DASHBOARDS)
+// TAB SWITCHING (MULTI-PAGE)
 // ==========================================
 function switchNocTab(tab) {
-    ['all', 'visits', 'inventory', 'analytics', 'admin'].forEach(t => {
-        const viewEl = document.getElementById(`noc-${t}View`); const btnEl = document.getElementById(`nocTab-${t}`);
-        if (viewEl) viewEl.classList.add('hidden');
-        if (btnEl) { btnEl.classList.remove('ent-tab-active'); btnEl.classList.add('ent-tab-inactive'); }
-    });
-    const activeView = document.getElementById(`noc-${tab}View`); const activeBtn = document.getElementById(`nocTab-${tab}`);
-    if (activeView) activeView.classList.remove('hidden');
-    if (activeBtn) { activeBtn.classList.remove('ent-tab-inactive'); activeBtn.classList.add('ent-tab-active'); }
-    
-    if (tab === 'analytics') renderCompanyGrid();
-    if (tab === 'admin') { fetchUsersList(); loadPlatformSettings(); }
-    if (tab === 'visits') { fetchUsersList().then(() => populateVisitCompanies()); fetchVisits(); }
-    if (tab === 'inventory') { fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); }); }
+    const routes = {
+        'all': 'admin-dashboard.html',
+        'visits': 'admin-visits.html',
+        'inventory': 'admin-inventory.html',
+        'analytics': 'admin-analytics.html',
+        'admin': 'admin-management.html'
+    };
+    if (routes[tab]) {
+        window.location.href = routes[tab];
+    }
 }
 
 function switchAdminTab(subTab) {
@@ -535,7 +555,7 @@ async function refreshJustTheChat(ticketId) {
             }
             const chatBox = document.getElementById('modalChatHistory');
             const newHTML = chatsHTML || `<div class="h-full flex items-center justify-center"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider text-center">No messages yet.</p></div>`;
-            if (chatBox.innerHTML !== newHTML) { chatBox.innerHTML = newHTML; chatBox.scrollTop = chatBox.scrollHeight; }
+            if (chatBox && chatBox.innerHTML !== newHTML) { chatBox.innerHTML = newHTML; chatBox.scrollTop = chatBox.scrollHeight; }
         }
     } catch (e) { }
 }
@@ -732,13 +752,19 @@ async function refreshNOCDashboardSilently() {
         if (currentStr !== newStr) {
             const checkedIds = Array.from(document.querySelectorAll('.ticket-checkbox:checked')).map(cb => cb.value);
             nocDashboardTickets = newTickets;
-            document.getElementById('kpiTotal').innerText = nocDashboardTickets.length;
-            document.getElementById('kpiUnassigned').innerText = nocDashboardTickets.filter(t => !t.assigned_to || t.assigned_to.trim() === "").length;
-            document.getElementById('kpiOpen').innerText = nocDashboardTickets.filter(t => t.status === "Pending Approval" || t.status === "Monitoring").length;
-            document.getElementById('kpiAssigned').innerText = nocDashboardTickets.filter(t => t.status === "Assigned").length;
-            document.getElementById('kpiWorking').innerText = nocDashboardTickets.filter(t => t.status === "Working").length;
-            document.getElementById('kpiResolved').innerText = nocDashboardTickets.filter(t => t.status === "Resolved").length;
-            updateChart(nocDashboardTickets); filterDashboard();
+            
+            if (document.getElementById('kpiTotal')) {
+                document.getElementById('kpiTotal').innerText = nocDashboardTickets.length;
+                document.getElementById('kpiUnassigned').innerText = nocDashboardTickets.filter(t => !t.assigned_to || t.assigned_to.trim() === "").length;
+                document.getElementById('kpiOpen').innerText = nocDashboardTickets.filter(t => t.status === "Pending Approval" || t.status === "Monitoring").length;
+                document.getElementById('kpiAssigned').innerText = nocDashboardTickets.filter(t => t.status === "Assigned").length;
+                document.getElementById('kpiWorking').innerText = nocDashboardTickets.filter(t => t.status === "Working").length;
+                document.getElementById('kpiResolved').innerText = nocDashboardTickets.filter(t => t.status === "Resolved").length;
+            }
+            
+            if(document.getElementById('monthlyChart')) updateChart(nocDashboardTickets); 
+            if(document.getElementById('dashboardTableBody')) filterDashboard();
+            
             checkedIds.forEach(id => { const cb = document.querySelector(`.ticket-checkbox[value="${id}"]`); if (cb) cb.checked = true; });
         }
     } catch (e) { }
@@ -746,19 +772,29 @@ async function refreshNOCDashboardSilently() {
 }
 
 async function fetchDashboardTickets() {
-    const tbody = document.getElementById('dashboardTableBody'); if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i></td></tr>`;
+    const tbody = document.getElementById('dashboardTableBody'); 
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i></td></tr>`;
+    
     try {
         const res = await apiPost({ action: "get_tickets" }); const data = await res.json();
         nocDashboardTickets = data.tickets || []; nocDashboardTickets = nocDashboardTickets.filter(t => t && t.id).reverse();
-        document.getElementById('kpiTotal').innerText = nocDashboardTickets.length;
-        document.getElementById('kpiUnassigned').innerText = nocDashboardTickets.filter(t => !t.assigned_to || t.assigned_to.trim() === "").length;
-        document.getElementById('kpiOpen').innerText = nocDashboardTickets.filter(t => t.status === "Pending Approval" || t.status === "Monitoring").length;
-        document.getElementById('kpiAssigned').innerText = nocDashboardTickets.filter(t => t.status === "Assigned").length;
-        document.getElementById('kpiWorking').innerText = nocDashboardTickets.filter(t => t.status === "Working").length;
-        document.getElementById('kpiResolved').innerText = nocDashboardTickets.filter(t => t.status === "Resolved").length;
-        updateChart(nocDashboardTickets); filterDashboard();
-    } catch (e) { tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-rose-500 font-bold">API Connection Error. Ensure DB is published.</td></tr>`; }
+        
+        if (document.getElementById('kpiTotal')) {
+            document.getElementById('kpiTotal').innerText = nocDashboardTickets.length;
+            document.getElementById('kpiUnassigned').innerText = nocDashboardTickets.filter(t => !t.assigned_to || t.assigned_to.trim() === "").length;
+            document.getElementById('kpiOpen').innerText = nocDashboardTickets.filter(t => t.status === "Pending Approval" || t.status === "Monitoring").length;
+            document.getElementById('kpiAssigned').innerText = nocDashboardTickets.filter(t => t.status === "Assigned").length;
+            document.getElementById('kpiWorking').innerText = nocDashboardTickets.filter(t => t.status === "Working").length;
+            document.getElementById('kpiResolved').innerText = nocDashboardTickets.filter(t => t.status === "Resolved").length;
+        }
+        
+        if(document.getElementById('monthlyChart')) updateChart(nocDashboardTickets); 
+        if(document.getElementById('companyCardsGrid')) renderCompanyGrid();
+        if(tbody) filterDashboard();
+        
+    } catch (e) { 
+        if(tbody) tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-rose-500 font-bold">API Connection Error. Ensure DB is published.</td></tr>`; 
+    }
 }
 
 function setQuickFilter(status) {
@@ -881,10 +917,10 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 // ==========================================
 // ASSET INVENTORY ENGINE (ENTERPRISE SPECS)
 // ==========================================
-
 function updateProcessorModels() {
     const brand = document.getElementById('invProcessorBrand').value;
     const modelSelect = document.getElementById('invProcessorType');
+    if (!modelSelect) return;
     
     let html = '<option value="" disabled selected>Select Model</option>';
     
@@ -944,9 +980,8 @@ function updateInventoryUserFilter() {
 
 function populateInventoryCompanies() {
     const compSelect = document.getElementById('invCompany');
-    if (!compSelect) return; // Failsafe if not on the page
+    if (!compSelect) return; 
     
-    // Inject default placeholder so it never appears blank
     let html = '<option value="" disabled selected>Select Company</option>';
     
     if (globalRegisteredCompanies.length > 0) {
@@ -974,7 +1009,7 @@ function filterInventoryUsers() {
         const users = globalUsersList.filter(u => u.company === selectedComp);
         users.forEach(u => { opts += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)} (${escapeHTML(u.email)})</option>`; });
     }
-    userSelect.innerHTML = opts;
+    if (userSelect) userSelect.innerHTML = opts;
 }
 
 async function fetchInventory() {
@@ -1016,7 +1051,6 @@ function renderInventory() {
                 let specsRaw = parts[0].replace('[SPECS]', '').trim();
                 let notesRaw = parts[1] ? parts[1].trim() : '';
                 
-                // Convert | delimited specs to nice chips
                 let specChips = specsRaw.split('|').map(s => `<span class="inline-block px-1.5 py-0.5 bg-white rounded border border-indigo-100 text-indigo-700 whitespace-nowrap mb-1 mr-1">${escapeHTML(s.trim())}</span>`).join('');
                 
                 specsDisplay = `<div class="mt-3 bg-indigo-50/50 border border-indigo-100 rounded-lg p-2.5 text-[9px] font-bold shadow-inner leading-tight"><div class="text-indigo-400 mb-1 uppercase tracking-widest"><i class="fa-solid fa-microchip"></i> Hardware</div>${specChips}</div>`;
@@ -1109,7 +1143,6 @@ async function saveAsset(e) {
     const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
     const adminEmail = compObj ? (compObj.admin_email || '') : '';
 
-    // Collect Hardware Specs safely
     const make = document.getElementById('invMake') ? document.getElementById('invMake').value : '';
     const modelInput = document.getElementById('invModel');
     const model = modelInput ? modelInput.value.trim() : '';
@@ -1132,10 +1165,8 @@ async function saveAsset(e) {
     let specsArr = [];
     if (pBrand || pType) specsArr.push(`CPU: ${pBrand} ${pType}`.trim());
     if (ram || ramType) specsArr.push(`RAM: ${ram} ${ramType}`.trim());
-    
     if (pCap || pTypeStore) specsArr.push(`OS Drive: ${pCap} ${pTypeStore}`.trim());
     if (sCap && sCap !== 'None') specsArr.push(`Data Drive: ${sCap} ${sTypeStore}`.trim());
-    
     if (gpu) specsArr.push(`GPU: ${gpu}`);
     if (display) specsArr.push(`Display: ${display}`);
     
@@ -1365,9 +1396,7 @@ function autoFillVisitDetails() {
 }
 
 function quickScheduleVisit(companyName) {
-    switchNocTab('visits'); populateVisitCompanies();
-    const compSelect = document.getElementById('visitCompany'); compSelect.value = companyName;
-    autoFillVisitDetails(); compSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.location.href = 'admin-visits.html'; 
 }
 
 // ==========================================
@@ -1379,50 +1408,62 @@ async function fetchUsersList() {
         const resC = await apiPost({ action: 'db_read', target_sheet: 'Companies' }); const dataC = await resC.json();
         if (dataU.status === 'success') {
             globalUsersList = dataU.users || []; globalRegisteredCompanies = dataC.data || [];
+            
             const compNames = globalRegisteredCompanies.map(c => c.company || c["company name"] || c.name);
-            const compFilter = document.getElementById('corpUserCompanyFilter'); if (compFilter) { compFilter.innerHTML = '<option value="All">All Companies</option>' + compNames.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join(''); }
-            const newUComp = document.getElementById('newUserCompany'); if (newUComp) { newUComp.innerHTML = '<option value="" disabled selected>Select Company</option>' + compNames.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join(''); }
-            renderUsersList(); renderRegisteredCompanies();
+            const compFilter = document.getElementById('corpUserCompanyFilter'); 
+            if (compFilter) { compFilter.innerHTML = '<option value="All">All Companies</option>' + compNames.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join(''); }
+            
+            const newUComp = document.getElementById('newUserCompany'); 
+            if (newUComp) { newUComp.innerHTML = '<option value="" disabled selected>Select Company</option>' + compNames.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join(''); }
+            
+            renderUsersList(); 
+            renderRegisteredCompanies();
         }
     } catch (e) { }
 }
 
 function renderUsersList() {
     const corpContainer = document.getElementById('corporateUsersList'); const itContainer = document.getElementById('itAdminsList');
-    if (!corpContainer || !itContainer) return;
-    const search = (document.getElementById('corpUserSearch')?.value || '').toLowerCase(); const companyFilter = document.getElementById('corpUserCompanyFilter')?.value || 'All';
+    if (!corpContainer && !itContainer) return;
+    
+    const search = (document.getElementById('corpUserSearch')?.value || '').toLowerCase(); 
+    const companyFilter = document.getElementById('corpUserCompanyFilter')?.value || 'All';
 
-    let itHTML = '';
-    globalUsersList.forEach(u => {
-        if (u.role !== 'Client' && u.role !== 'Approver') {
-            let telegramBadge = u.telegram_id ? `<span class="px-2 py-0.5 ml-3 bg-blue-50 border border-blue-200 text-blue-600 rounded text-[9px] shadow-sm"><i class="fa-brands fa-telegram"></i> ${escapeHTML(u.telegram_id)}</span>` : '';
-            itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span>
-            <button onclick="resetITStaffPassword('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 shadow-sm transition-all" title="Reset Password"><i class="fa-solid fa-key text-xs"></i></button>
-            <button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
-        }
-    });
-    itContainer.innerHTML = itHTML || '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-4">No IT admins found.</p>';
+    if (itContainer) {
+        let itHTML = '';
+        globalUsersList.forEach(u => {
+            if (u.role !== 'Client' && u.role !== 'Approver') {
+                let telegramBadge = u.telegram_id ? `<span class="px-2 py-0.5 ml-3 bg-blue-50 border border-blue-200 text-blue-600 rounded text-[9px] shadow-sm"><i class="fa-brands fa-telegram"></i> ${escapeHTML(u.telegram_id)}</span>` : '';
+                itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span>
+                <button onclick="resetITStaffPassword('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 shadow-sm transition-all" title="Reset Password"><i class="fa-solid fa-key text-xs"></i></button>
+                <button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
+            }
+        });
+        itContainer.innerHTML = itHTML || '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-4">No IT admins found.</p>';
+    }
 
-    let hierarchyHTML = '';
-    const filteredCorpUsers = globalUsersList.filter(u => (u.role === 'Client' || u.role === 'Approver') && (companyFilter === 'All' || u.company === companyFilter) && (!search || u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search) || u.company.toLowerCase().includes(search) || (u.phone || '').includes(search)));
-    const companies = [...new Set(filteredCorpUsers.map(u => u.company))];
+    if (corpContainer) {
+        let hierarchyHTML = '';
+        const filteredCorpUsers = globalUsersList.filter(u => (u.role === 'Client' || u.role === 'Approver') && (companyFilter === 'All' || u.company === companyFilter) && (!search || u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search) || u.company.toLowerCase().includes(search) || (u.phone || '').includes(search)));
+        const companies = [...new Set(filteredCorpUsers.map(u => u.company))];
 
-    companies.forEach(company => {
-        hierarchyHTML += `<div class="mb-8"><h4 class="font-black text-xl text-slate-800 border-b border-slate-200 pb-3 mb-4"><i class="fa-solid fa-building text-blue-600 mr-3"></i> ${escapeHTML(company)}</h4>`;
-        const compUsers = filteredCorpUsers.filter(u => u.company === company); const managers = [...new Set(compUsers.map(u => u.manager || 'No Assigned Manager'))];
+        companies.forEach(company => {
+            hierarchyHTML += `<div class="mb-8"><h4 class="font-black text-xl text-slate-800 border-b border-slate-200 pb-3 mb-4"><i class="fa-solid fa-building text-blue-600 mr-3"></i> ${escapeHTML(company)}</h4>`;
+            const compUsers = filteredCorpUsers.filter(u => u.company === company); const managers = [...new Set(compUsers.map(u => u.manager || 'No Assigned Manager'))];
 
-        managers.forEach(manager => {
-            hierarchyHTML += `<div class="ml-4 mb-5"><h5 class="text-[11px] font-extrabold text-slate-500 mb-3 uppercase tracking-widest"><i class="fa-solid fa-sitemap mr-2"></i> Manager: ${escapeHTML(manager)}</h5>`;
-            const reports = compUsers.filter(u => (u.manager || 'No Assigned Manager') === manager);
-            reports.forEach(u => {
-                const roleBadge = u.role === 'Approver' ? `<span class="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold ml-3">APPROVER</span>` : `<span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded text-[9px] font-bold ml-3">USER</span>`;
-                hierarchyHTML += `<div class="flex items-center justify-between p-4 glass-surface bg-white rounded-xl shadow-sm mb-3 ml-6 hover:shadow-md transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${roleBadge}</p><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.phone || 'No Phone')}</p></div><div class="flex gap-2"><button onclick="openEditCorpUserModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.manager)}', '${escapeHTML(u.company)}', '${escapeHTML(u.phone)}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all"><i class="fa-solid fa-pen text-xs"></i></button><button onclick="deleteCorporateUser('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center justify-center shadow-sm transition-all"><i class="fa-solid fa-trash text-xs"></i></button></div></div>`;
+            managers.forEach(manager => {
+                hierarchyHTML += `<div class="ml-4 mb-5"><h5 class="text-[11px] font-extrabold text-slate-500 mb-3 uppercase tracking-widest"><i class="fa-solid fa-sitemap mr-2"></i> Manager: ${escapeHTML(manager)}</h5>`;
+                const reports = compUsers.filter(u => (u.manager || 'No Assigned Manager') === manager);
+                reports.forEach(u => {
+                    const roleBadge = u.role === 'Approver' ? `<span class="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold ml-3">APPROVER</span>` : `<span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded text-[9px] font-bold ml-3">USER</span>`;
+                    hierarchyHTML += `<div class="flex items-center justify-between p-4 glass-surface bg-white rounded-xl shadow-sm mb-3 ml-6 hover:shadow-md transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${roleBadge}</p><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.phone || 'No Phone')}</p></div><div class="flex gap-2"><button onclick="openEditCorpUserModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.manager)}', '${escapeHTML(u.company)}', '${escapeHTML(u.phone)}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all"><i class="fa-solid fa-pen text-xs"></i></button><button onclick="deleteCorporateUser('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center justify-center shadow-sm transition-all"><i class="fa-solid fa-trash text-xs"></i></button></div></div>`;
+                });
+                hierarchyHTML += `</div>`;
             });
             hierarchyHTML += `</div>`;
         });
-        hierarchyHTML += `</div>`;
-    });
-    corpContainer.innerHTML = hierarchyHTML || '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No corporate users found.</p>';
+        corpContainer.innerHTML = hierarchyHTML || '<p class="text-sm font-bold uppercase tracking-wider text-slate-500 text-center py-10">No corporate users found.</p>';
+    }
 }
 
 function renderRegisteredCompanies() {
@@ -1478,7 +1519,6 @@ function openEditCorpUserModal(email, currentRole, currentManager, currentCompan
     document.getElementById('editCorpUserEmail').value = email; document.getElementById('editCorpUserRole').value = currentRole || 'Client'; document.getElementById('editCorpUserPhone').value = currentPhone || '';
     if (currentPhone) document.getElementById('editCorpUserPhone').classList.add('has-val'); else document.getElementById('editCorpUserPhone').classList.remove('has-val');
     
-    // Clear password reset field
     document.getElementById('editCorpUserPassword').value = '';
     document.getElementById('editCorpUserPassword').classList.remove('has-val');
 
@@ -1529,7 +1569,6 @@ function openEditITStaffModal(email, currentRole, currentPhone, currentTelegram)
     document.getElementById('editITStaffPhone').value = currentPhone || ''; 
     document.getElementById('editITStaffTelegram').value = currentTelegram || '';
     
-    // Clear password reset field when opening
     document.getElementById('editITStaffPassword').value = '';
     document.getElementById('editITStaffPassword').classList.remove('has-val');
 
@@ -1591,4 +1630,180 @@ async function registerNewAdmin(e) {
 async function deleteCorporateUser(email) {
     if (!confirm(`Delete user ${email}?`)) return;
     try { await apiPost({ action: 'delete_user', email: email }); fetchUsersList(); } catch (e) { alert("Failed to delete user."); }
+}
+
+// ==========================================
+// TICKET SUBMISSION LOGIC
+// ==========================================
+function handleRequestTypeChange() {
+    const reqSelect = document.getElementById('requestType');
+    const reqType = reqSelect ? reqSelect.value : 'Incident';
+    const catSelect = document.getElementById('deviceType');
+
+    if (!catSelect) return;
+
+    const filteredCategories = appConfigData.filter(c => c.type === 'Category' && c.parent === reqType);
+
+    if (filteredCategories.length > 0) {
+        let html = `<option value="" disabled selected>Select Category</option>`;
+        filteredCategories.forEach(c => { html += `<option value="${c.value}">${c.value}</option>`; });
+        catSelect.innerHTML = html;
+    } else {
+        if (reqType === 'Incident') { catSelect.innerHTML = `<option value="" disabled selected>Select Incident Category</option><option value="Authentication/Login">Account & Access</option><option value="Laptop/Desktop">Endpoint Hardware</option><option value="Software/App">Software & Applications</option>`; }
+        else { catSelect.innerHTML = `<option value="" disabled selected>Select Service Category</option><option value="New Asset Setup">New Employee Setup</option><option value="New Device Peripherals">Hardware Request</option>`; }
+    }
+
+    updateFormLogic();
+}
+
+function updateFormLogic() {
+    const reqType = document.getElementById('requestType') ? document.getElementById('requestType').value : 'Incident';
+    const category = document.getElementById('deviceType') ? document.getElementById('deviceType').value : '';
+    const priority = document.getElementById('priority') ? document.getElementById('priority').value : 'Medium';
+
+    const priorityWrapper = document.getElementById('priorityWrapper');
+    const assetTagWrapper = document.getElementById('assetTagWrapper');
+    if (reqType === 'Service') {
+        if (priorityWrapper) priorityWrapper.style.display = 'none';
+        if (assetTagWrapper) assetTagWrapper.style.display = 'none';
+    } else {
+        if (priorityWrapper) priorityWrapper.style.display = 'flex';
+        if (assetTagWrapper) assetTagWrapper.style.display = 'flex';
+    }
+
+    const joineeFields = document.getElementById('newJoineeFields'); const jName = document.getElementById('joineeName'); const jLoc = document.getElementById('joineeLocation');
+    if (category === 'New Asset Setup' && joineeFields) { joineeFields.classList.remove('hidden'); jName.disabled = false; jLoc.disabled = false; } else if (joineeFields) { joineeFields.classList.add('hidden'); jName.disabled = true; jLoc.disabled = true; jName.value = ''; jLoc.value = ''; }
+    const peripheralFields = document.getElementById('newPeripheralFields'); const pList = document.getElementById('peripheralList');
+    if (category === 'New Device Peripherals' && peripheralFields) { peripheralFields.classList.remove('hidden'); pList.disabled = false; } else if (peripheralFields) { peripheralFields.classList.add('hidden'); pList.disabled = true; pList.value = ''; }
+
+    const rsFields = document.getElementById('remoteSupportFields'); const rsId = document.getElementById('remoteId'); const rsPass = document.getElementById('remotePass'); const rApp = document.getElementById('remoteApp');
+    if (reqType === 'Incident' && (category === 'Laptop/Desktop' || category === 'Software/App') && (priority === 'Low' || priority === 'Medium') && rsFields) {
+        rsFields.classList.remove('hidden'); rsId.disabled = false; rsPass.disabled = false; rApp.disabled = false;
+    } else if (rsFields) {
+        rsFields.classList.add('hidden'); rsId.disabled = true; rsPass.disabled = true; rApp.disabled = true; rsId.value = ''; rsPass.value = '';
+    }
+}
+
+function handleTicketForChange() {
+    const isElse = document.getElementById('ticketFor').value === 'Someone Else'; const peerWrapper = document.getElementById('peerWrapper'); const peerSelect = document.getElementById('ticketForPeer'); const tName = document.getElementById('ticketName'); const tEmail = document.getElementById('ticketEmail'); const tPhone = document.getElementById('phoneNumber'); const pLabel = document.getElementById('phoneLabel');
+    if (isElse) {
+        peerWrapper.classList.remove('hidden'); tPhone.required = true; pLabel.innerText = "Contact Number *";
+        let opts = `<option value="" disabled selected></option>`;
+        if (clientSession && clientSession.peers) { clientSession.peers.forEach(p => { if (p.email.toLowerCase() !== clientSession.email.toLowerCase()) { opts += `<option value="${p.email}" data-name="${escapeHTML(p.name)}" data-phone="${escapeHTML(p.phone || '')}">${escapeHTML(p.name)} (${p.email})</option>`; } }); }
+        peerSelect.innerHTML = opts; peerSelect.disabled = false;
+        peerSelect.onchange = () => { const opt = peerSelect.options[peerSelect.selectedIndex]; tName.value = opt.getAttribute('data-name'); tEmail.value = opt.value; tPhone.value = opt.getAttribute('data-phone') || ''; tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val'); };
+        tName.value = ""; tEmail.value = ""; tPhone.value = ""; tName.classList.remove('has-val'); tEmail.classList.remove('has-val'); tPhone.classList.remove('has-val');
+    } else {
+        peerWrapper.classList.add('hidden'); peerSelect.disabled = true; tPhone.required = false; pLabel.innerText = "Contact Number";
+        tName.value = clientSession.name; tEmail.value = clientSession.email; tPhone.value = clientSession.phone || "";
+        tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val');
+    }
+}
+
+function handleRemoteAppChange() { const app = document.getElementById('remoteApp').value; const passLabel = document.getElementById('remotePassLabel'); if (app === 'AnyDesk') { passLabel.innerText = "Remote Password (Optional)"; } else { passLabel.innerText = "Remote Password"; } }
+
+function toggleNewTicketForm() {
+    const form = document.getElementById('newTicketFormContainer'); form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) { handleRequestTypeChange(); if (clientSession) { document.getElementById('ticketCompany').value = clientSession.company; document.getElementById('ticketCompany').classList.add('has-val'); handleTicketForChange(); } }
+}
+
+async function submitTicket(e) {
+    e.preventDefault(); const btn = document.getElementById('submitBtn'); const rsFields = document.getElementById('remoteSupportFields'); const fileInput = document.getElementById('attachmentFile'); let rsAppVal = '', rsIdVal = '', rsPassVal = '';
+    if (!rsFields.classList.contains('hidden')) {
+        rsAppVal = document.getElementById('remoteApp').value; rsIdVal = document.getElementById('remoteId').value.trim(); rsPassVal = document.getElementById('remotePass').value.trim(); const requiresPass = (rsAppVal !== 'AnyDesk');
+        if (!rsIdVal && (!rsPassVal && requiresPass) && (!fileInput || fileInput.files.length === 0)) { alert("ACTION REQUIRED:\n\nFor Low/Medium priority Endpoint Incidents, you MUST either provide your Remote Support credentials OR attach a screenshot of the issue."); return; }
+    }
+    btn.innerHTML = 'Processing...'; btn.disabled = true;
+    const reqType = document.getElementById('requestType').value; const category = document.getElementById('deviceType').value; let desc = document.getElementById('message').value; const contactMethod = document.getElementById('contactMethod').value; const ccEmail = document.getElementById('ticketCC') ? document.getElementById('ticketCC').value.trim() : '';
+    desc = `[Contact via: ${contactMethod}]\n` + (ccEmail ? `[CC: ${ccEmail}]\n\n` : '\n') + desc;
+    let status = (reqType === "Service") ? "Pending Approval" : "Monitoring"; let remoteSupportStr = "N/A";
+    if (!rsFields.classList.contains('hidden') && (rsIdVal || rsPassVal)) { remoteSupportStr = `App: ${rsAppVal} | ID: ${rsIdVal || 'N/A'} | Pass: ${rsPassVal || 'Optional'}`; }
+    if (category === 'New Asset Setup') { const jName = document.getElementById('joineeName').value; const jLoc = document.getElementById('joineeLocation').value; desc = `[NEW JOINEE SETUP]\nJoinee Name: ${jName}\nLocation/Desk: ${jLoc}\n\nAdditional Notes:\n${desc}`; } else if (category === 'New Device Peripherals') { const selectedPeripheral = document.getElementById('peripheralList').value; desc = `[NEW PERIPHERAL REQUEST]\nRequested Item: ${selectedPeripheral}\n\nAdditional Notes:\n${desc}`; }
+    const phoneNumber = document.getElementById('phoneNumber').value.trim(); const fullPhone = phoneNumber ? `(${document.getElementById('countryCode').value}) ${phoneNumber}` : "N/A";
+    let fileData = null, fileName = null, fileMimeType = null;
+    if (fileInput && fileInput.files.length > 0) {
+        const file = fileInput.files[0]; if (file.size > 5 * 1024 * 1024) { alert("File too large. Max 5MB allowed."); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false; return; }
+        fileName = file.name; fileMimeType = file.type; fileData = await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(file); });
+    }
+    const payload = { action: "create_ticket", id: "", name: document.getElementById('ticketName').value.trim(), company: document.getElementById('ticketCompany').value.trim(), phone: fullPhone, email: document.getElementById('ticketEmail').value.trim(), request_type: reqType, category: category, impact_level: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, asset: document.getElementById('assetTag') ? document.getElementById('assetTag').value : "N/A", device: category, remote_support: remoteSupportStr, priority: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, subject: document.getElementById('ticketSubject').value, description: desc, date: new Date().toISOString(), status: status, fileData: fileData, fileName: fileName, fileMimeType: fileMimeType };
+    try { const res = await apiPost(payload); const data = await res.json(); alert(`Ticket ${data.id} Submitted!\nStatus: ${status}`); document.getElementById('ticketForm').reset(); toggleNewTicketForm(); fetchClientTickets(); if (clientSession && clientSession.role === 'Approver') fetchApproverTickets(); } catch (e) { alert('Error submitting ticket. Try without attachment if it persists.'); }
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false;
+}
+
+// ==========================================
+// KNOWLEDGE BASE ENGINE
+// ==========================================
+function toggleKB(btn) {
+    const item = btn.parentElement;
+    document.querySelectorAll('.kb-item').forEach(el => { if (el !== item) { const content = el.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); const icon = el.querySelector('i.kb-icon'); if (icon) icon.classList.remove('rotate-180'); } });
+    const content = item.querySelector('.kb-item-content'); const icon = item.querySelector('i.kb-icon');
+    if (content.classList.contains('hidden')) { content.classList.remove('hidden'); icon.classList.add('rotate-180'); } else { content.classList.add('hidden'); icon.classList.remove('rotate-180'); }
+}
+function filterKB(e) {
+    const input = document.getElementById('kbSearchInput').value.toLowerCase(); const items = document.querySelectorAll('.kb-item'); let found = false;
+    items.forEach(item => { if (item.innerText.toLowerCase().includes(input)) { item.style.display = "block"; found = true; } else { item.style.display = "none"; const content = item.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); } });
+    document.getElementById('kbNoResults').style.display = (!found && input.trim() !== '') ? 'block' : 'none';
+    if (e && e.key === 'Enter' && input.trim() !== '') searchGoogle();
+}
+function searchGoogle() {
+    const query = document.getElementById('kbSearchInput').value.trim();
+    if (query) window.open('https://www.google.com/search?q=' + encodeURIComponent(query + " troubleshooting IT support"), '_blank');
+}
+
+// ==========================================
+// ANALYTICS & EXPORT ENGINE
+// ==========================================
+function updateChart(tickets) {
+    const ctx = document.getElementById('monthlyChart'); if (!ctx) return;
+    const monthlyCounts = {};
+    tickets.forEach(t => { try { const d = new Date(t.date); const monthYear = d.toLocaleString('default', { month: 'short', year: 'numeric' }); if (monthYear !== "Invalid Date") { monthlyCounts[monthYear] = (monthlyCounts[monthYear] || 0) + 1; } } catch (e) { } });
+    const labels = Object.keys(monthlyCounts).sort((a, b) => new Date(a) - new Date(b)); const data = labels.map(l => monthlyCounts[l]);
+    chartDataExport = labels.map((l, i) => ({ Month: l, Total_Tickets: data[i] }));
+    if (monthlyChartInstance) monthlyChartInstance.destroy();
+    monthlyChartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'line', data: { labels: labels, datasets: [{ label: 'Service Requests', data: data, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.08)', borderWidth: 3, fill: true, tension: 0.3, pointBackgroundColor: '#2563eb', pointRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } } } }
+    });
+}
+
+function renderCompanyGrid() {
+    const grid = document.getElementById('companyCardsGrid'); if (!grid) return;
+    const comps = [...new Set(nocDashboardTickets.map(t => t.company).filter(Boolean))]; let html = '';
+    comps.forEach(c => {
+        let tCount = nocDashboardTickets.filter(t => t.company === c).length;
+        html += `<div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"><div class="flex items-center gap-4"><div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold border border-blue-100"><i class="fa-solid fa-building"></i></div><div><h4 class="font-black text-slate-800 text-sm">${escapeHTML(c)}</h4><p class="text-xs text-slate-500 font-medium">Active Infrastructure</p></div></div><h3 class="text-2xl font-black text-blue-600">${tCount}</h3></div>`;
+    });
+    grid.innerHTML = html || '<p class="text-slate-500 text-sm">No ticket data available.</p>';
+}
+
+function exportGlobalQueueExcel() {
+    if (nocDashboardTickets.length === 0) return alert("No data to export.");
+    const cleanData = nocDashboardTickets.map(t => ({ "Ticket ID": t.id, "Date": t.date, "Company": t.company, "Requester": t.name, "Email": t.email, "Phone": t.phone, "Type": t.request_type, "Category": t.category, "Priority": t.priority, "Asset/Host": t.asset, "Subject": t.subject, "Status": t.status, "Assigned To": t.assigned_to, "Remote ID": t.remote_support }));
+    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Global Queue"); XLSX.writeFile(wb, "SpreadIT_GlobalQueue.xlsx");
+}
+
+function exportFullRawTickets() {
+    if (nocDashboardTickets.length === 0) return alert("No data to export.");
+    const cleanData = nocDashboardTickets.map(t => { let d = { ...t }; delete d.chat_history; delete d.fileData; return d; });
+    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Raw Tickets Data"); XLSX.writeFile(wb, "SpreadIT_Raw_Tickets_Data.xlsx");
+}
+
+function exportChartExcel() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    const ws = XLSX.utils.json_to_sheet(chartDataExport); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Monthly Analytics"); XLSX.writeFile(wb, "SpreadIT_Monthly_Analytics.xlsx");
+}
+
+function exportChartPPT() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    let pptx = new PptxGenJS(); let slide = pptx.addSlide(); slide.addText("Monthly Ticketing Analytics", { x: 0.5, y: 0.5, fontSize: 24, color: '363636', bold: true });
+    let tableData = [["Month", "Total Tickets"]]; chartDataExport.forEach(r => tableData.push([r.Month, r.Total_Tickets]));
+    slide.addTable(tableData, { x: 0.5, y: 1.5, w: 8, fill: 'F1F1F1', fontSize: 14, color: '363636' }); pptx.writeFile({ fileName: "SpreadIT_Analytics.pptx" });
+}
+
+function exportChartPDF() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(20); doc.text("Monthly Ticketing Analytics", 14, 22); doc.setFontSize(12);
+    let startY = 40; doc.text("Month", 14, startY); doc.text("Total Tickets", 80, startY); startY += 10;
+    chartDataExport.forEach(r => { doc.text(String(r.Month), 14, startY); doc.text(String(r.Total_Tickets), 80, startY); startY += 10; });
+    doc.save("SpreadIT_Analytics.pdf");
 }
