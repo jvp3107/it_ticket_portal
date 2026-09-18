@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management Hub | Spread Technical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="flex flex-col min-h-screen font-sans antialiased">
+    
+    <!-- ADMIN MANAGEMENT MODALS -->
+    <div id="editCorpUserModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white" id="editCorpUserModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-pen text-emerald-500 mr-2"></i> Edit Client Profile</h3>
+            
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-envelope input-icon text-slate-400"></i><input type="email" id="editCorpUserEmail" class="itsm-input pl-10 bg-slate-50 cursor-not-allowed text-slate-500 font-bold" readonly placeholder=" "><span class="itsm-label" style="left:44px;">Corporate Email</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-key input-icon text-amber-500"></i><input type="text" id="editCorpUserPassword" class="itsm-input pl-10 border-amber-200 focus:border-amber-500" placeholder=" " autocomplete="off"><span class="itsm-label text-amber-600 font-bold" style="left:44px;">Reset Password (Optional)</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-building input-icon"></i><select id="editCorpUserCompany" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span class="itsm-label" style="left:44px;">Company</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon"></i><input type="tel" id="editCorpUserPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Phone Number</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-sitemap input-icon"></i><select id="editCorpUserManager" class="itsm-input appearance-none pl-10 cursor-pointer"></select><span class="itsm-label" style="left:44px;">Assign Manager</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tag input-icon"></i><select id="editCorpUserRole" class="itsm-input appearance-none pl-10 cursor-pointer"><option value="Client">Standard Employee</option><option value="Approver">Approver / Manager</option></select><span class="itsm-label" style="left:44px;">Role</span></div>
+            
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5">
+                <button onclick="closeEditCorpUserModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button>
+                <button onclick="saveCorpUserEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editITStaffModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-sm transform scale-95 transition-transform duration-300 bg-white" id="editITStaffModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-user-shield text-blue-500 mr-2"></i> Edit IT Staff</h3>
+            
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-envelope input-icon text-slate-400"></i><input type="email" id="editITStaffEmail" class="itsm-input pl-10 bg-slate-50 cursor-not-allowed text-slate-500 font-bold" readonly placeholder=" "><span class="itsm-label" style="left:44px;">Staff Email Address</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-key input-icon text-amber-500"></i><input type="text" id="editITStaffPassword" class="itsm-input pl-10 border-amber-200 focus:border-amber-500" placeholder=" " autocomplete="off"><span class="itsm-label text-amber-600 font-bold" style="left:44px;">Reset Password (Optional)</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon text-slate-400"></i><input type="tel" id="editITStaffPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Phone Number</span></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-brands fa-telegram input-icon text-blue-500"></i><input type="text" id="editITStaffTelegram" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Telegram Chat ID</span></div>
+            
+            <div class="itsm-input-wrapper mb-4">
+                <i class="fa-solid fa-user-tag input-icon text-slate-400"></i>
+                <select id="editITStaffRole" class="itsm-input appearance-none pl-10 cursor-pointer">
+                    <option value="Tier 1 Support">Tier 1 Support</option>
+                    <option value="Tier 2 Support">Tier 2 Support</option>
+                    <option value="System Admin">System Admin</option>
+                    <option value="Master Admin">Master Admin</option>
+                    <option value="Super Admin">Super Admin</option>
+                </select>
+                <span class="itsm-label" style="left:44px;">Privilege Role</span>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-8 border-t border-slate-200 pt-5">
+                <button onclick="closeEditITStaffModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button>
+                <button onclick="saveITStaffEdits(event)" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Update Staff</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editCompanyModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4 transition-opacity opacity-0 duration-300">
+        <div class="glass-panel rounded-[32px] p-8 w-full max-w-md transform scale-95 transition-transform duration-300 bg-white" id="editCompanyModalBox">
+            <h3 class="font-bold text-lg mb-6 text-slate-800"><i class="fa-solid fa-building text-blue-500 mr-2"></i> Edit Company Profile</h3>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-signature input-icon"></i><input type="text" id="editCompName" class="itsm-input pl-10 text-slate-500 bg-slate-100 cursor-not-allowed border-slate-200" readonly><span class="itsm-label" style="left:44px;">Company Registry Name</span></div>
+            <div class="grid grid-cols-2 gap-4"><div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-globe input-icon"></i><input type="text" id="editCompDomain" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Primary Domain</span></div><div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-phone input-icon"></i><input type="text" id="editCompPhone" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Office Phone</span></div></div>
+            <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-location-dot input-icon"></i><input type="text" id="editCompAddress" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Office Address</span></div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-user-tie input-icon"></i><input type="text" id="editCompContact" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">IT Contact</span></div>
+                <div class="itsm-input-wrapper mb-4"><i class="fa-solid fa-envelope input-icon"></i><input type="email" id="editCompAdminEmail" class="itsm-input pl-10" placeholder=" "><span class="itsm-label" style="left:44px;">Admin Email (Alerts)</span></div>
+            </div>
+
+            <div class="itsm-input-wrapper mb-4"><textarea id="editCompNotes" rows="2" class="itsm-input py-4 rounded-[16px] pl-4" placeholder=" "></textarea><span class="itsm-label" style="left:16px;">Internal SLA / Routing Notes</span></div>
+            <div class="flex justify-end gap-3 mt-6 border-t border-slate-200 pt-5"><button onclick="closeEditCompanyModal()" class="px-5 py-2.5 text-slate-600 font-bold bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-full text-sm transition">Cancel</button><button onclick="saveCompanyEdits(event)" id="btnSaveCompany" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-full text-sm shadow-md hover:bg-blue-500 transition">Save Profile</button></div>
+        </div>
+    </div>
+
+    <!-- GLOBAL HEADER -->
+    <header class="glass-header sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-md border border-blue-500/50"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="border-l-2 border-slate-300 pl-4">
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">SPREAD TECHNICAL</h1>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">IT Service Management</p>
+                </div>
+            </div>
+            <button onclick="logoutGlobal()" id="globalLogoutBtn" class="bg-rose-50 border border-rose-200 text-rose-600 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-rose-100 transition-all flex items-center gap-2 shadow-sm hidden"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        
+        <!-- Navigation Tabs -->
+        <div class="admin-nav-container mb-10 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
+            <button onclick="switchNocTab('all')" id="nocTab-all" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-layer-group"></i> Global Queue</button>
+            <button onclick="switchNocTab('visits')" id="nocTab-visits" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-map-location-dot"></i> Field Visits</button>
+            <button onclick="switchNocTab('inventory')" id="nocTab-inventory" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-boxes-stacked"></i> Asset Inventory</button>
+            <button onclick="switchNocTab('analytics')" id="nocTab-analytics" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-chart-pie"></i> Analytics & Exports</button>
+            <button onclick="switchNocTab('admin')" id="nocTab-admin" class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-users-gear"></i> Admin Management</button>
+        </div>
+
+        <!-- ADMIN MANAGEMENT VIEW -->
+        <div id="noc-adminView" class="animate-fade-in max-w-6xl mx-auto">
+            <div class="mb-10 text-center">
+                <h2 class="text-4xl font-black text-slate-800">Admin Management Hub</h2>
+                <p class="text-slate-500 mt-3 font-medium">Centralized controls for directory and integrations.</p>
+            </div>
+            
+            <!-- Enterprise Sub-Navigation -->
+            <div class="admin-nav-container mb-8 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
+                <button onclick="switchAdminTab('corp')" id="admTabBtn-corp" class="ent-tab-btn ent-tab-active whitespace-nowrap">Corporate Users</button>
+                <button onclick="switchAdminTab('companies')" id="admTabBtn-companies" class="ent-tab-btn ent-tab-inactive whitespace-nowrap">Company Directory</button>
+                <button onclick="switchAdminTab('it')" id="admTabBtn-it" class="ent-tab-btn ent-tab-inactive whitespace-nowrap">IT Staff</button>
+                <button onclick="switchAdminTab('apps')" id="admTabBtn-apps" class="ent-tab-btn ent-tab-inactive whitespace-nowrap">App Connections & Flags</button>
+            </div>
+
+            <!-- Sub-tab: Corporate Users -->
+            <div id="admTab-corp" class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md bg-white">
+                    <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-user-plus text-emerald-600 mr-2"></i> Add Client User</h3>
+                    <form onsubmit="createCorporateUser(event)" class="space-y-5">
+                        <div class="itsm-input-wrapper mb-0"><select id="newUserCompany" required class="itsm-input appearance-none pl-4 cursor-pointer" onchange="updateManagerDropdown()"></select><span class="itsm-label" style="left:16px;">Company Name</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newUserName" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Employee Name</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="email" id="newUserEmail" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Corporate Email</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="tel" id="newUserPhone" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Phone Number (Optional)</span></div>
+                        <div class="itsm-input-wrapper mb-0"><select id="newUserRole" class="itsm-input appearance-none cursor-pointer pl-4" required><option value="Client" selected>Standard Employee</option><option value="Approver">Department Manager / Approver</option></select><span class="itsm-label" style="left:16px;">Portal Role</span></div>
+                        <div class="itsm-input-wrapper mb-0"><select id="newUserManager" class="itsm-input appearance-none pl-4 cursor-pointer"><option value="">No Manager / Self</option></select><span class="itsm-label" style="left:16px;">Manager Name (Optional)</span></div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-full shadow-md border border-emerald-500/30 hover:bg-emerald-500 hover:-translate-y-1 transition-all mt-4">Generate User</button>
+                    </form>
+                </div>
+                <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 flex flex-col h-full shadow-md bg-white">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
+                        <h3 class="font-black text-slate-800 text-xl whitespace-nowrap"><i class="fa-solid fa-sitemap text-emerald-600 mr-2"></i> Client Hierarchy</h3>
+                        <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end">
+                            <select id="corpUserCompanyFilter" onchange="renderUsersList()" class="px-5 py-2.5 bg-white border border-slate-300 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-sm"><option value="All">All Companies</option></select>
+                            <div class="relative"><i class="fa-solid fa-search absolute left-5 top-1/2 transform -translate-y-1/2 text-slate-400"></i><input type="text" id="corpUserSearch" onkeyup="renderUsersList()" class="w-full pl-12 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-medium outline-none text-slate-800 placeholder-slate-400 shadow-inner" placeholder="Search users..."></div>
+                            <button onclick="exportUsersExcel()" class="bg-emerald-600 border border-emerald-500 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-sm hover:bg-emerald-500 transition-colors"><i class="fa-solid fa-file-excel"></i></button>
+                        </div>
+                    </div>
+                    <div id="corporateUsersList" class="space-y-5 overflow-y-auto flex-grow pr-2" style="max-height: 600px;"></div>
+                </div>
+            </div>
+
+            <!-- Sub-tab: Companies Directory -->
+            <div id="admTab-companies" class="hidden grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md bg-white">
+                    <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-building text-blue-600 mr-2"></i> Register Company</h3>
+                    <form onsubmit="registerNewCompany(event)" class="space-y-4">
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newRegCompanyName" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Company Name *</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newRegDomain" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Primary Domain</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="email" id="newRegAdminEmail" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Admin Email (For Asset Alerts) *</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newRegAddress" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Address</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newRegContact" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">IT Contact Person</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="tel" id="newRegPhone" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Support Phone</span></div>
+                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-4 rounded-full shadow-md hover:-translate-y-1 hover:bg-blue-500 transition-all mt-4">Register Company</button>
+                    </form>
+                </div>
+                <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                    <h3 class="font-black text-slate-800 text-xl mb-6 border-b border-slate-200 pb-5"><i class="fa-solid fa-list-check text-blue-600 mr-2"></i> Registered Companies</h3>
+                    <div id="registeredCompaniesList" class="space-y-4 max-h-[600px] overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+
+            <!-- Sub-tab: IT Staff -->
+            <div id="admTab-it" class="hidden grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                <div class="lg:col-span-1 glass-panel rounded-[32px] p-8 self-start shadow-md border-l-4 border-blue-500 bg-white">
+                    <h3 class="font-black text-slate-800 text-xl mb-6"><i class="fa-solid fa-user-shield text-blue-600 mr-2"></i> Provision IT Staff</h3>
+                    <form onsubmit="registerNewAdmin(event)" class="space-y-5">
+                        <div class="itsm-input-wrapper mb-0"><input type="text" id="newAdminName" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Staff Name</span></div>
+                        <div class="itsm-input-wrapper mb-0"><input type="email" id="newAdminEmail" required class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Staff Email Address</span></div>
+                        <div class="itsm-input-wrapper mb-0"><select id="newAdminRole" class="itsm-input appearance-none pl-4 cursor-pointer"><option value="Tier 1 Support" selected>Tier 1 Support</option><option value="Tier 2 Support">Tier 2 Support</option><option value="System Admin">System Admin</option><option value="Master Admin">Master Admin</option><option value="Super Admin">Super Admin</option></select><span class="itsm-label" style="left:16px;">Role</span></div>
+                        <div class="itsm-input-wrapper mb-0 mt-5"><input type="text" id="newAdminTelegram" class="itsm-input pl-4" placeholder=" " autocomplete="off"><span class="itsm-label" style="left:16px;">Telegram Chat ID (Optional)</span></div>
+                        <button type="submit" class="w-full bg-slate-800 text-white font-bold py-4 rounded-full shadow-md hover:bg-slate-700 transition-all mt-4">Provision Account</button>
+                    </form>
+                </div>
+                <div class="lg:col-span-2 glass-panel rounded-[32px] p-8 shadow-md bg-white">
+                    <h3 class="font-black text-slate-800 text-xl mb-6 border-b border-slate-200 pb-5"><i class="fa-solid fa-users-gear text-blue-600 mr-2"></i> IT Directory</h3>
+                    <div id="itAdminsList" class="space-y-4 max-h-[500px] overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+
+            <!-- Sub-tab: Platform Settings & Feature Flags -->
+            <div id="admTab-apps" class="hidden animate-fade-in max-w-5xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Settings Column -->
+                    <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white self-start">
+                        <div class="flex items-center mb-8"><div class="w-14 h-14 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-2xl mr-5 shadow-sm"><i class="fa-brands fa-telegram"></i></div><div><h3 class="font-black text-xl text-slate-800">Platform Settings</h3><p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Database Settings Sheet</p></div></div>
+                        <div class="space-y-5 mb-8">
+                            <div><label class="text-xs font-bold text-slate-600 mb-2 block uppercase tracking-wider">Telegram Bot Token</label><input type="text" id="setBotToken" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 text-slate-800 shadow-inner" placeholder="e.g. 12345:ABCDE..."></div>
+                            <div><label class="text-xs font-bold text-slate-600 mb-2 block uppercase tracking-wider">Telegram Chat ID(s)</label><input type="text" id="setChatId" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 text-slate-800 shadow-inner" placeholder="e.g. 712453173"></div>
+                        </div>
+                        <button onclick="savePlatformSettings()" class="w-full bg-blue-600 text-white py-4 rounded-full text-sm font-bold shadow-md hover:bg-blue-500 transition-colors active:scale-95">Save Settings to Database</button>
+                    </div>
+
+                    <!-- Feature Flags Toggle Column -->
+                    <div class="glass-panel rounded-[32px] p-8 shadow-md bg-white self-start">
+                        <div class="flex items-center mb-6"><div class="w-14 h-14 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl mr-5 shadow-sm"><i class="fa-solid fa-toggle-on"></i></div><div><h3 class="font-black text-xl text-slate-800">Feature Flags & Kill-Switch</h3><p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Instant Portal Control</p></div></div>
+                        <p class="text-xs text-slate-500 mb-6 font-medium">Toggle switches below to instantly enable or disable tabs, buttons, and dropdown menus across the entire portal.</p>
+                        <div id="featureFlagsContainer" class="space-y-3 max-h-[380px] overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ZERO-TOUCH DYNAMIC MODULES INJECTION ZONE -->
+            <div class="mt-12 col-span-full">
+                <div id="dynamicModuleNav" class="mb-4"></div>
+                <div id="universalTableContainer"></div>
+            </div>
+            
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+</html>
