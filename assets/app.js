@@ -49,7 +49,7 @@ async function apiPost(payload) {
     const userActions = [
         "save_user", "register_client", "register_it_staff", "update_user_profile",
         "get_users", "login_admin", "login_client", "delete_user", "reset_password",
-        "get_companies", "save_company", "delete_company"
+        "get_companies", "save_company", "delete_company", "resend_invitation" // 🔴 Resend Action Added
     ];
     
     let targetUrl = DB_CONFIG.ticketApiUrl;
@@ -964,6 +964,7 @@ function autoFillFromText() {
         else if (key.includes('model')) setFormValue('invModel', val);
         else if (key.includes('system type')) setFormValue('invSystemType', val);
         else if (key.includes('serial number')) setFormValue('invSerialNumber', val);
+        else if (key.includes('assigned')) setFormValue('invAssignedUser', val);
         else if (key.includes('logged-in user')) setFormValue('invLoggedInUser', val);
         else if (key.includes('os name')) setFormValue('invOsName', val);
         else if (key.includes('version') || key.includes('build')) setFormValue('invOsVersion', val);
@@ -1098,16 +1099,17 @@ function populateInventoryCompanies() {
 
 function filterInventoryUsers() {
     const selectedComp = document.getElementById('invCompany').value;
-    const userSelect = document.getElementById('invLoggedInUser');
-    if (!userSelect) return;
+    const assignedSelect = document.getElementById('invAssignedUser');
+    const loggedInSelect = document.getElementById('invLoggedInUser');
 
     let opts = `<option value="" disabled selected></option><option value="IT Stock">IT Stock (Unassigned)</option>`;
     if (selectedComp) {
         const users = globalUsersList.filter(u => u.company === selectedComp);
         users.forEach(u => { opts += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)} (${escapeHTML(u.email)})</option>`; });
     }
-    userSelect.innerHTML = opts;
-    userSelect.classList.remove('has-val');
+    
+    if (assignedSelect) { assignedSelect.innerHTML = opts; assignedSelect.classList.remove('has-val'); }
+    if (loggedInSelect) { loggedInSelect.innerHTML = opts; loggedInSelect.classList.remove('has-val'); }
 }
 
 async function fetchInventory() {
@@ -1128,7 +1130,7 @@ function renderInventory() {
     
     let filtered = globalInventory.filter(i => 
         (companyFilter === 'All' || i.company === companyFilter) &&
-        (userFilter === 'All' || i.logged_in_user === userFilter)
+        (userFilter === 'All' || i.assigned_to === userFilter || i.logged_in_user === userFilter)
     );
 
     if (filtered.length === 0) { 
@@ -1155,7 +1157,7 @@ function renderInventory() {
             
             <div class="mt-4 border-t border-slate-100 pt-4">
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-4 text-[10px] text-slate-600">
-                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Hostname</span><span class="font-semibold text-slate-800">${escapeHTML(item.hostname || 'N/A')}</span></div>
+                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Assigned To</span><span class="font-semibold text-blue-600">${escapeHTML(item.assigned_to || 'N/A')}</span></div>
                     <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Logged-In User</span><span class="font-semibold text-slate-800">${escapeHTML(item.logged_in_user || 'N/A')}</span></div>
                     <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">System Type</span><span class="font-semibold text-slate-800">${escapeHTML(item.system_type || 'N/A')}</span></div>
                     
@@ -1186,7 +1188,7 @@ function exportInventoryExcel() {
     
     let filtered = globalInventory.filter(i => 
         (companyFilter === 'All' || i.company === companyFilter) &&
-        (userFilter === 'All' || i.logged_in_user === userFilter)
+        (userFilter === 'All' || i.assigned_to === userFilter || i.logged_in_user === userFilter)
     );
 
     if (filtered.length === 0) return alert("No data matches the current filters.");
@@ -1196,6 +1198,7 @@ function exportInventoryExcel() {
             "Asset Tag": item.asset_tag,
             "Hostname": item.hostname,
             "Client Company": item.company,
+            "Assigned To": item.assigned_to,
             "Logged-in User": item.logged_in_user,
             "Make / Manufacturer": item.make,
             "Model": item.model,
@@ -1234,6 +1237,7 @@ async function saveAsset(e) {
         asset_tag: document.getElementById('invAssetTag').value.trim(),
         hostname: document.getElementById('invHostname').value.trim(),
         company: companyName,
+        assigned_to: document.getElementById('invAssignedUser').value,
         logged_in_user: document.getElementById('invLoggedInUser').value,
         make: document.getElementById('invMake').value,
         model: document.getElementById('invModel').value,
@@ -1257,6 +1261,8 @@ async function saveAsset(e) {
         document.getElementById('invAssetTag').value = '';
         document.getElementById('invHostname').value = '';
         document.getElementById('invSerialNumber').value = '';
+        document.getElementById('invAssignedUser').value = '';
+        document.getElementById('invLoggedInUser').value = '';
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
         alert("Asset successfully provisioned in the directory."); 
@@ -1346,7 +1352,7 @@ function renderVisits() {
         let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
-        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden group">
+        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
             <div class="flex justify-between items-start">
                 <h4 class="font-black text-sm text-slate-800 flex items-center flex-wrap gap-2">
                     ${escapeHTML(v.company)} 
@@ -1486,6 +1492,19 @@ async function fetchUsersList() {
     } catch (e) { }
 }
 
+async function resendWelcomeEmail(email, name) {
+    if (!confirm(`Resend the portal invitation email to ${email}?`)) return;
+    try { 
+        const res = await apiPost({ action: 'resend_invitation', email: email, name: name }); 
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert(`Invitation successfully resent to ${email}`); 
+        } else {
+            alert("Error from database: " + data.message);
+        }
+    } catch (e) { alert("Failed to connect to User Database."); }
+}
+
 function renderUsersList() {
     const corpContainer = document.getElementById('corporateUsersList'); const itContainer = document.getElementById('itAdminsList');
     if (!corpContainer && !itContainer) return;
@@ -1499,6 +1518,7 @@ function renderUsersList() {
             if (u.role !== 'Client' && u.role !== 'Approver') {
                 let telegramBadge = u.telegram_id ? `<span class="px-2 py-0.5 ml-3 bg-blue-50 border border-blue-200 text-blue-600 rounded text-[9px] shadow-sm"><i class="fa-brands fa-telegram"></i> ${escapeHTML(u.telegram_id)}</span>` : '';
                 itHTML += `<div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 glass-surface bg-white rounded-xl mb-3 hover:shadow-sm transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${telegramBadge}</p><p class="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.company)}</p></div><div class="flex items-center gap-3 mt-3 sm:mt-0"><span class="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-[10px] font-bold uppercase">${escapeHTML(u.role)}</span>
+                <button onclick="resendWelcomeEmail('${escapeHTML(u.email)}', '${escapeHTML(u.name)}')" class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shadow-sm transition-all" title="Resend Invite"><i class="fa-solid fa-envelope text-xs"></i></button>
                 <button onclick="resetITStaffPassword('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 shadow-sm transition-all" title="Reset Password"><i class="fa-solid fa-key text-xs"></i></button>
                 <button onclick="openEditITStaffModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.phone || '')}', '${escapeHTML(u.telegram_id || '')}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all" title="Edit IT Staff"><i class="fa-solid fa-pen text-xs"></i></button></div></div>`;
             }
@@ -1520,7 +1540,9 @@ function renderUsersList() {
                 const reports = compUsers.filter(u => (u.manager || 'No Assigned Manager') === manager);
                 reports.forEach(u => {
                     const roleBadge = u.role === 'Approver' ? `<span class="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold ml-3">APPROVER</span>` : `<span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded text-[9px] font-bold ml-3">USER</span>`;
-                    hierarchyHTML += `<div class="flex items-center justify-between p-4 glass-surface bg-white rounded-xl shadow-sm mb-3 ml-6 hover:shadow-md transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${roleBadge}</p><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.phone || 'No Phone')}</p></div><div class="flex gap-2"><button onclick="openEditCorpUserModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.manager)}', '${escapeHTML(u.company)}', '${escapeHTML(u.phone)}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all"><i class="fa-solid fa-pen text-xs"></i></button><button onclick="deleteCorporateUser('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center justify-center shadow-sm transition-all"><i class="fa-solid fa-trash text-xs"></i></button></div></div>`;
+                    hierarchyHTML += `<div class="flex items-center justify-between p-4 glass-surface bg-white rounded-xl shadow-sm mb-3 ml-6 hover:shadow-md transition-shadow"><div><p class="font-extrabold text-sm text-slate-800 flex items-center">${escapeHTML(u.name)} ${roleBadge}</p><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-1">${escapeHTML(u.email)} | ${escapeHTML(u.phone || 'No Phone')}</p></div><div class="flex gap-2">
+                    <button onclick="resendWelcomeEmail('${escapeHTML(u.email)}', '${escapeHTML(u.name)}')" class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shadow-sm transition-all" title="Resend Invite"><i class="fa-solid fa-envelope text-xs"></i></button>
+                    <button onclick="openEditCorpUserModal('${escapeHTML(u.email)}', '${escapeHTML(u.role)}', '${escapeHTML(u.manager)}', '${escapeHTML(u.company)}', '${escapeHTML(u.phone)}')" class="w-8 h-8 rounded-full bg-slate-100 text-blue-600 hover:bg-slate-200 shadow-sm transition-all"><i class="fa-solid fa-pen text-xs"></i></button><button onclick="deleteCorporateUser('${escapeHTML(u.email)}')" class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 flex items-center justify-center shadow-sm transition-all"><i class="fa-solid fa-trash text-xs"></i></button></div></div>`;
                 });
                 hierarchyHTML += `</div>`;
             });
