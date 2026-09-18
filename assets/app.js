@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchDashboardTickets();
             startNocPolling();
         } else if (currentTab === 'inventory') {
-            fetchUsersList().then(() => { populateInventoryCompanies(); populateProcessorDropdown(); });
+            fetchUsersList().then(() => { populateInventoryCompanies(); populateProcessorDropdown(); updateModelSuggestions(); });
         } else if (currentTab === 'roster') {
             fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); });
         } else if (currentTab === 'visits') {
@@ -927,7 +927,7 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// ASSET INVENTORY ENGINE & OCR PARSER
+// ASSET INVENTORY ENGINE (EXPANDED & OCR)
 // ==========================================
 
 function autoFillFromText() {
@@ -976,7 +976,6 @@ function autoFillFromText() {
 
     if (storageText.trim()) setFormValue('invStorage', storageText.trim());
     
-    // Clear OCR box after successful parse
     document.getElementById('invRawOcrText').value = '';
     alert("Hardware details parsed and populated successfully!");
 }
@@ -1006,13 +1005,44 @@ function setFormValue(id, val) {
         el.value = val;
     }
     el.classList.add('has-val');
+    
+    // Trigger input event to update dependent Datalists
+    el.dispatchEvent(new Event('input'));
+}
+
+function updateModelSuggestions() {
+    const makeInput = document.getElementById('invMake');
+    const modelList = document.getElementById('modelList');
+    if (!makeInput || !modelList) return;
+
+    const make = makeInput.value.trim().toLowerCase();
+    let html = '';
+    
+    if (make.includes('lenovo')) {
+        html += `<option value="ThinkPad T14"><option value="ThinkPad T16"><option value="ThinkPad X1 Carbon"><option value="ThinkBook 15"><option value="IdeaPad"><option value="Legion">`;
+    } else if (make.includes('dell')) {
+        html += `<option value="Latitude 3000"><option value="Latitude 5000"><option value="Latitude 7000"><option value="XPS 13"><option value="XPS 15"><option value="Precision"><option value="OptiPlex Micro">`;
+    } else if (make.includes('hp')) {
+        html += `<option value="EliteBook 800"><option value="EliteBook 600"><option value="ProBook 400"><option value="Spectre x360"><option value="ZBook Firefly">`;
+    } else if (make.includes('apple')) {
+        html += `<option value="MacBook Air (M1)"><option value="MacBook Air (M3)"><option value="MacBook Pro 14-inch"><option value="MacBook Pro 16-inch"><option value="Mac mini">`;
+    } else if (make.includes('asus')) {
+        html += `<option value="ZenBook"><option value="VivoBook"><option value="ROG Zephyrus"><option value="ExpertBook">`;
+    } else if (make.includes('acer')) {
+        html += `<option value="Swift"><option value="Aspire"><option value="Predator"><option value="TravelMate">`;
+    } else if (make.includes('microsoft')) {
+        html += `<option value="Surface Pro 9"><option value="Surface Pro 10"><option value="Surface Laptop 5"><option value="Surface Laptop 6"><option value="Surface Studio">`;
+    } else {
+        html += `<option value="ThinkPad T14"><option value="Latitude 5000"><option value="EliteBook 800"><option value="MacBook Pro 14-inch">`;
+    }
+
+    modelList.innerHTML = html;
 }
 
 function populateProcessorDropdown() {
     const dataList = document.getElementById('processorList');
     if (!dataList) return;
     
-    // Dynamic List of Modern CPUs
     const processors = [
         "Intel Core Ultra 9 285K", "Intel Core Ultra 7 265K", "Intel Core Ultra 5 245K",
         "Intel Core Ultra 9 285H", "Intel Core Ultra 7 265H", "Intel Core Ultra 5 255H",
@@ -1316,7 +1346,7 @@ function renderVisits() {
         let durationDisplay = v.duration ? `<span class="text-blue-600 font-black"><i class="fa-solid fa-stopwatch mr-1 text-blue-500"></i> ${escapeHTML(v.duration)}</span>` : '<span class="text-slate-400 font-medium">Ongoing</span>';
 
         html += `
-        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden">
+        <div class="p-5 bg-white border border-slate-200 rounded-[20px] flex flex-col hover:shadow-md transition-all gap-3 relative overflow-hidden group">
             <div class="flex justify-between items-start">
                 <h4 class="font-black text-sm text-slate-800 flex items-center flex-wrap gap-2">
                     ${escapeHTML(v.company)} 
