@@ -40,6 +40,9 @@ function goTo(pageUrl) {
     window.location.href = pageUrl;
 }
 
+// ==========================================
+// SECURE API COMMUNICATION
+// ==========================================
 async function apiPost(payload) {
     payload.api_key = DB_CONFIG.apiKey;
 
@@ -147,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentTab = 'all';
         if (path.includes('admin-visits.html')) currentTab = 'visits';
         if (path.includes('admin-inventory.html')) currentTab = 'inventory';
+        if (path.includes('admin-roster.html')) currentTab = 'roster';
         if (path.includes('admin-analytics.html')) currentTab = 'analytics';
         if (path.includes('admin-management.html')) currentTab = 'admin';
         
@@ -168,7 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchDashboardTickets();
             startNocPolling();
         } else if (currentTab === 'inventory') {
-            fetchUsersList().then(() => { populateInventoryCompanies(); populateProcessorDropdown(); fetchInventory(); });
+            fetchUsersList().then(() => { populateInventoryCompanies(); populateProcessorDropdown(); });
+        } else if (currentTab === 'roster') {
+            fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); });
         } else if (currentTab === 'visits') {
             fetchUsersList().then(() => populateVisitCompanies()); fetchVisits();
         } else if (currentTab === 'analytics') {
@@ -445,6 +451,7 @@ function switchNocTab(tab) {
         'all': 'admin-dashboard.html',
         'visits': 'admin-visits.html',
         'inventory': 'admin-inventory.html',
+        'roster': 'admin-roster.html',
         'analytics': 'admin-analytics.html',
         'admin': 'admin-management.html'
     };
@@ -920,25 +927,101 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// ASSET INVENTORY ENGINE (EXPANDED)
+// ASSET INVENTORY ENGINE & OCR PARSER
 // ==========================================
+
+function autoFillFromText() {
+    const rawText = document.getElementById('invRawOcrText').value;
+    if (!rawText.trim()) return;
+
+    const lines = rawText.split('\n');
+    let storageText = "";
+    let isStorage = false;
+
+    lines.forEach(line => {
+        if (line.toUpperCase().includes('STORAGE - PHYSICAL DISKS')) {
+            isStorage = true;
+            let parts = line.split(/[:-]/);
+            if (parts.length > 2) storageText = parts.slice(2).join(':').trim();
+            return;
+        }
+
+        if (isStorage && !line.includes(':')) {
+            storageText += " " + line.trim();
+            return;
+        } else if (line.includes(':')) {
+            isStorage = false;
+        }
+
+        let parts = line.split(':');
+        if (parts.length < 2) return;
+        
+        let key = parts[0].trim().toLowerCase();
+        let val = parts.slice(1).join(':').trim();
+
+        if (key.includes('hostname')) setFormValue('invHostname', val);
+        else if (key.includes('make') || key.includes('manufacturer')) setFormValue('invMake', val);
+        else if (key.includes('model')) setFormValue('invModel', val);
+        else if (key.includes('system type')) setFormValue('invSystemType', val);
+        else if (key.includes('serial number')) setFormValue('invSerialNumber', val);
+        else if (key.includes('logged-in user')) setFormValue('invLoggedInUser', val);
+        else if (key.includes('os name')) setFormValue('invOsName', val);
+        else if (key.includes('version') || key.includes('build')) setFormValue('invOsVersion', val);
+        else if (key.includes('architecture')) setFormValue('invArchitecture', val);
+        else if (key.includes('processor')) setFormValue('invProcessor', val);
+        else if (key.includes('cores') || key.includes('threads')) setFormValue('invCoresThreads', val);
+        else if (key.includes('graphics')) setFormValue('invGraphics', val);
+        else if (key.includes('total ram') || key.includes('memory')) setFormValue('invRAM', val);
+    });
+
+    if (storageText.trim()) setFormValue('invStorage', storageText.trim());
+    
+    // Clear OCR box after successful parse
+    document.getElementById('invRawOcrText').value = '';
+    alert("Hardware details parsed and populated successfully!");
+}
+
+function setFormValue(id, val) {
+    let el = document.getElementById(id);
+    if (!el) return;
+
+    if (el.tagName === 'SELECT') {
+        let found = false;
+        for (let i = 0; i < el.options.length; i++) {
+            let optVal = el.options[i].value.toLowerCase();
+            if (optVal && (optVal.includes(val.toLowerCase()) || val.toLowerCase().includes(optVal))) {
+                el.selectedIndex = i;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            let newOpt = document.createElement('option');
+            newOpt.value = val;
+            newOpt.text = val;
+            newOpt.selected = true;
+            el.appendChild(newOpt);
+        }
+    } else {
+        el.value = val;
+    }
+    el.classList.add('has-val');
+}
+
 function populateProcessorDropdown() {
     const dataList = document.getElementById('processorList');
     if (!dataList) return;
     
-    // Comprehensive list of common Enterprise processors for autocomplete
+    // Dynamic List of Modern CPUs
     const processors = [
         "Intel Core Ultra 9 285K", "Intel Core Ultra 7 265K", "Intel Core Ultra 5 245K",
-        "Intel Core Ultra 9 185H", "Intel Core Ultra 7 165H", "Intel Core Ultra 7 155H", 
-        "Intel Core Ultra 7 165U", "Intel Core Ultra 7 155U", "Intel Core Ultra 5 135H", 
-        "Intel Core Ultra 5 125H", "Intel Core Ultra 5 135U", "Intel Core Ultra 5 125U", 
+        "Intel Core Ultra 9 285H", "Intel Core Ultra 7 265H", "Intel Core Ultra 5 255H",
+        "Intel Core Ultra 7 255U", "Intel Core Ultra 5 225U", 
         "Intel Core i9-14900K", "Intel Core i7-14700K", "Intel Core i5-14600K",
-        "Intel Core i9-13900K", "Intel Core i7-13700K", "Intel Core i5-13600K",
-        "AMD Ryzen 9 7950X", "AMD Ryzen 9 7900X", "AMD Ryzen 7 7800X3D", 
-        "AMD Ryzen 7 7700X", "AMD Ryzen 5 7600X", "AMD Ryzen Threadripper PRO",
-        "Apple M3 Max", "Apple M3 Pro", "Apple M3",
-        "Apple M2 Max", "Apple M2 Pro", "Apple M2",
-        "Apple M1 Max", "Apple M1 Pro", "Apple M1"
+        "AMD Ryzen 9 9950X", "AMD Ryzen 9 9900X", "AMD Ryzen 7 9700X", "AMD Ryzen 5 9600X",
+        "AMD Ryzen AI 9 HX 370", "AMD Ryzen AI 9 365",
+        "Apple M4 Max", "Apple M4 Pro", "Apple M4",
+        "Apple M3 Max", "Apple M3 Pro", "Apple M3"
     ];
     
     let html = '';
@@ -962,22 +1045,39 @@ function updateInventoryUserFilter() {
 
 function populateInventoryCompanies() {
     const compSelect = document.getElementById('invCompany');
-    if (!compSelect) return; 
-    let html = '<option value="" disabled selected></option>';
-    
-    if (globalRegisteredCompanies.length > 0) {
+    if (compSelect && globalRegisteredCompanies.length > 0) {
+        let html = '<option value="" disabled selected></option>';
         globalRegisteredCompanies.forEach(c => { 
             const cName = escapeHTML(c.company || c["company name"] || c.name); 
             html += `<option value="${cName}">${cName}</option>`; 
         });
+        compSelect.innerHTML = html;
     }
-    compSelect.innerHTML = html;
     
     const filterSelect = document.getElementById('inventoryCompanyFilter');
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="All">All Companies</option>' + (globalRegisteredCompanies.length > 0 ? html.replace('<option value="" disabled selected></option>', '') : '');
+    if (filterSelect && globalRegisteredCompanies.length > 0) {
+        let fHtml = '<option value="All">All Companies</option>';
+        globalRegisteredCompanies.forEach(c => { 
+            const cName = escapeHTML(c.company || c["company name"] || c.name); 
+            fHtml += `<option value="${cName}">${cName}</option>`; 
+        });
+        filterSelect.innerHTML = fHtml;
     }
     updateInventoryUserFilter();
+}
+
+function filterInventoryUsers() {
+    const selectedComp = document.getElementById('invCompany').value;
+    const userSelect = document.getElementById('invLoggedInUser');
+    if (!userSelect) return;
+
+    let opts = `<option value="" disabled selected></option><option value="IT Stock">IT Stock (Unassigned)</option>`;
+    if (selectedComp) {
+        const users = globalUsersList.filter(u => u.company === selectedComp);
+        users.forEach(u => { opts += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)} (${escapeHTML(u.email)})</option>`; });
+    }
+    userSelect.innerHTML = opts;
+    userSelect.classList.remove('has-val');
 }
 
 async function fetchInventory() {
@@ -1104,19 +1204,19 @@ async function saveAsset(e) {
         asset_tag: document.getElementById('invAssetTag').value.trim(),
         hostname: document.getElementById('invHostname').value.trim(),
         company: companyName,
-        logged_in_user: document.getElementById('invLoggedInUser').value.trim(),
-        make: document.getElementById('invMake').value.trim(),
-        model: document.getElementById('invModel').value.trim(),
+        logged_in_user: document.getElementById('invLoggedInUser').value,
+        make: document.getElementById('invMake').value,
+        model: document.getElementById('invModel').value,
         system_type: document.getElementById('invSystemType').value,
         serial_number: document.getElementById('invSerialNumber').value.trim(),
-        os_name: document.getElementById('invOsName').value.trim(),
-        os_version: document.getElementById('invOsVersion').value.trim(),
+        os_name: document.getElementById('invOsName').value,
+        os_version: document.getElementById('invOsVersion').value,
         architecture: document.getElementById('invArchitecture').value,
         processor: document.getElementById('invProcessor').value.trim(),
-        cores_threads: document.getElementById('invCoresThreads').value.trim(),
-        graphics_card: document.getElementById('invGraphics').value.trim(),
-        total_ram: document.getElementById('invRAM').value.trim(),
-        storage_disks: document.getElementById('invStorage').value.trim(),
+        cores_threads: document.getElementById('invCoresThreads').value,
+        graphics_card: document.getElementById('invGraphics').value,
+        total_ram: document.getElementById('invRAM').value,
+        storage_disks: document.getElementById('invStorage').value,
         status: document.getElementById('invStatus').value,
         notes: document.getElementById('invNotes').value.trim(),
         admin_email: adminEmail
@@ -1129,8 +1229,8 @@ async function saveAsset(e) {
         document.getElementById('invSerialNumber').value = '';
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
-        fetchInventory(); 
         alert("Asset successfully provisioned in the directory."); 
+        goTo('admin-roster.html');
     } catch (e) { alert("Network error saving asset."); }
     btn.innerHTML = "<i class='fa-solid fa-server mr-2'></i> Provision Asset in Database"; btn.disabled = false;
 }
@@ -1564,4 +1664,180 @@ async function registerNewAdmin(e) {
 async function deleteCorporateUser(email) {
     if (!confirm(`Delete user ${email}?`)) return;
     try { await apiPost({ action: 'delete_user', email: email }); fetchUsersList(); } catch (e) { alert("Failed to delete user."); }
+}
+
+// ==========================================
+// TICKET SUBMISSION LOGIC
+// ==========================================
+function handleRequestTypeChange() {
+    const reqSelect = document.getElementById('requestType');
+    const reqType = reqSelect ? reqSelect.value : 'Incident';
+    const catSelect = document.getElementById('deviceType');
+
+    if (!catSelect) return;
+
+    const filteredCategories = appConfigData.filter(c => c.type === 'Category' && c.parent === reqType);
+
+    if (filteredCategories.length > 0) {
+        let html = `<option value="" disabled selected>Select Category</option>`;
+        filteredCategories.forEach(c => { html += `<option value="${c.value}">${c.value}</option>`; });
+        catSelect.innerHTML = html;
+    } else {
+        if (reqType === 'Incident') { catSelect.innerHTML = `<option value="" disabled selected>Select Incident Category</option><option value="Authentication/Login">Account & Access</option><option value="Laptop/Desktop">Endpoint Hardware</option><option value="Software/App">Software & Applications</option>`; }
+        else { catSelect.innerHTML = `<option value="" disabled selected>Select Service Category</option><option value="New Asset Setup">New Employee Setup</option><option value="New Device Peripherals">Hardware Request</option>`; }
+    }
+
+    updateFormLogic();
+}
+
+function updateFormLogic() {
+    const reqType = document.getElementById('requestType') ? document.getElementById('requestType').value : 'Incident';
+    const category = document.getElementById('deviceType') ? document.getElementById('deviceType').value : '';
+    const priority = document.getElementById('priority') ? document.getElementById('priority').value : 'Medium';
+
+    const priorityWrapper = document.getElementById('priorityWrapper');
+    const assetTagWrapper = document.getElementById('assetTagWrapper');
+    if (reqType === 'Service') {
+        if (priorityWrapper) priorityWrapper.style.display = 'none';
+        if (assetTagWrapper) assetTagWrapper.style.display = 'none';
+    } else {
+        if (priorityWrapper) priorityWrapper.style.display = 'flex';
+        if (assetTagWrapper) assetTagWrapper.style.display = 'flex';
+    }
+
+    const joineeFields = document.getElementById('newJoineeFields'); const jName = document.getElementById('joineeName'); const jLoc = document.getElementById('joineeLocation');
+    if (category === 'New Asset Setup' && joineeFields) { joineeFields.classList.remove('hidden'); jName.disabled = false; jLoc.disabled = false; } else if (joineeFields) { joineeFields.classList.add('hidden'); jName.disabled = true; jLoc.disabled = true; jName.value = ''; jLoc.value = ''; }
+    const peripheralFields = document.getElementById('newPeripheralFields'); const pList = document.getElementById('peripheralList');
+    if (category === 'New Device Peripherals' && peripheralFields) { peripheralFields.classList.remove('hidden'); pList.disabled = false; } else if (peripheralFields) { peripheralFields.classList.add('hidden'); pList.disabled = true; pList.value = ''; }
+
+    const rsFields = document.getElementById('remoteSupportFields'); const rsId = document.getElementById('remoteId'); const rsPass = document.getElementById('remotePass'); const rApp = document.getElementById('remoteApp');
+    if (reqType === 'Incident' && (category === 'Laptop/Desktop' || category === 'Software/App') && (priority === 'Low' || priority === 'Medium') && rsFields) {
+        rsFields.classList.remove('hidden'); rsId.disabled = false; rsPass.disabled = false; rApp.disabled = false;
+    } else if (rsFields) {
+        rsFields.classList.add('hidden'); rsId.disabled = true; rsPass.disabled = true; rApp.disabled = true; rsId.value = ''; rsPass.value = '';
+    }
+}
+
+function handleTicketForChange() {
+    const isElse = document.getElementById('ticketFor').value === 'Someone Else'; const peerWrapper = document.getElementById('peerWrapper'); const peerSelect = document.getElementById('ticketForPeer'); const tName = document.getElementById('ticketName'); const tEmail = document.getElementById('ticketEmail'); const tPhone = document.getElementById('phoneNumber'); const pLabel = document.getElementById('phoneLabel');
+    if (isElse) {
+        peerWrapper.classList.remove('hidden'); tPhone.required = true; pLabel.innerText = "Contact Number *";
+        let opts = `<option value="" disabled selected></option>`;
+        if (clientSession && clientSession.peers) { clientSession.peers.forEach(p => { if (p.email.toLowerCase() !== clientSession.email.toLowerCase()) { opts += `<option value="${p.email}" data-name="${escapeHTML(p.name)}" data-phone="${escapeHTML(p.phone || '')}">${escapeHTML(p.name)} (${p.email})</option>`; } }); }
+        peerSelect.innerHTML = opts; peerSelect.disabled = false;
+        peerSelect.onchange = () => { const opt = peerSelect.options[peerSelect.selectedIndex]; tName.value = opt.getAttribute('data-name'); tEmail.value = opt.value; tPhone.value = opt.getAttribute('data-phone') || ''; tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val'); };
+        tName.value = ""; tEmail.value = ""; tPhone.value = ""; tName.classList.remove('has-val'); tEmail.classList.remove('has-val'); tPhone.classList.remove('has-val');
+    } else {
+        peerWrapper.classList.add('hidden'); peerSelect.disabled = true; tPhone.required = false; pLabel.innerText = "Contact Number";
+        tName.value = clientSession.name; tEmail.value = clientSession.email; tPhone.value = clientSession.phone || "";
+        tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val');
+    }
+}
+
+function handleRemoteAppChange() { const app = document.getElementById('remoteApp').value; const passLabel = document.getElementById('remotePassLabel'); if (app === 'AnyDesk') { passLabel.innerText = "Remote Password (Optional)"; } else { passLabel.innerText = "Remote Password"; } }
+
+function toggleNewTicketForm() {
+    const form = document.getElementById('newTicketFormContainer'); form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) { handleRequestTypeChange(); if (clientSession) { document.getElementById('ticketCompany').value = clientSession.company; document.getElementById('ticketCompany').classList.add('has-val'); handleTicketForChange(); } }
+}
+
+async function submitTicket(e) {
+    e.preventDefault(); const btn = document.getElementById('submitBtn'); const rsFields = document.getElementById('remoteSupportFields'); const fileInput = document.getElementById('attachmentFile'); let rsAppVal = '', rsIdVal = '', rsPassVal = '';
+    if (!rsFields.classList.contains('hidden')) {
+        rsAppVal = document.getElementById('remoteApp').value; rsIdVal = document.getElementById('remoteId').value.trim(); rsPassVal = document.getElementById('remotePass').value.trim(); const requiresPass = (rsAppVal !== 'AnyDesk');
+        if (!rsIdVal && (!rsPassVal && requiresPass) && (!fileInput || fileInput.files.length === 0)) { alert("ACTION REQUIRED:\n\nFor Low/Medium priority Endpoint Incidents, you MUST either provide your Remote Support credentials OR attach a screenshot of the issue."); return; }
+    }
+    btn.innerHTML = 'Processing...'; btn.disabled = true;
+    const reqType = document.getElementById('requestType').value; const category = document.getElementById('deviceType').value; let desc = document.getElementById('message').value; const contactMethod = document.getElementById('contactMethod').value; const ccEmail = document.getElementById('ticketCC') ? document.getElementById('ticketCC').value.trim() : '';
+    desc = `[Contact via: ${contactMethod}]\n` + (ccEmail ? `[CC: ${ccEmail}]\n\n` : '\n') + desc;
+    let status = (reqType === "Service") ? "Pending Approval" : "Monitoring"; let remoteSupportStr = "N/A";
+    if (!rsFields.classList.contains('hidden') && (rsIdVal || rsPassVal)) { remoteSupportStr = `App: ${rsAppVal} | ID: ${rsIdVal || 'N/A'} | Pass: ${rsPassVal || 'Optional'}`; }
+    if (category === 'New Asset Setup') { const jName = document.getElementById('joineeName').value; const jLoc = document.getElementById('joineeLocation').value; desc = `[NEW JOINEE SETUP]\nJoinee Name: ${jName}\nLocation/Desk: ${jLoc}\n\nAdditional Notes:\n${desc}`; } else if (category === 'New Device Peripherals') { const selectedPeripheral = document.getElementById('peripheralList').value; desc = `[NEW PERIPHERAL REQUEST]\nRequested Item: ${selectedPeripheral}\n\nAdditional Notes:\n${desc}`; }
+    const phoneNumber = document.getElementById('phoneNumber').value.trim(); const fullPhone = phoneNumber ? `(${document.getElementById('countryCode').value}) ${phoneNumber}` : "N/A";
+    let fileData = null, fileName = null, fileMimeType = null;
+    if (fileInput && fileInput.files.length > 0) {
+        const file = fileInput.files[0]; if (file.size > 5 * 1024 * 1024) { alert("File too large. Max 5MB allowed."); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false; return; }
+        fileName = file.name; fileMimeType = file.type; fileData = await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(file); });
+    }
+    const payload = { action: "create_ticket", id: "", name: document.getElementById('ticketName').value.trim(), company: document.getElementById('ticketCompany').value.trim(), phone: fullPhone, email: document.getElementById('ticketEmail').value.trim(), request_type: reqType, category: category, impact_level: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, asset: document.getElementById('assetTag') ? document.getElementById('assetTag').value : "N/A", device: category, remote_support: remoteSupportStr, priority: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, subject: document.getElementById('ticketSubject').value, description: desc, date: new Date().toISOString(), status: status, fileData: fileData, fileName: fileName, fileMimeType: fileMimeType };
+    try { const res = await apiPost(payload); const data = await res.json(); alert(`Ticket ${data.id} Submitted!\nStatus: ${status}`); document.getElementById('ticketForm').reset(); toggleNewTicketForm(); fetchClientTickets(); if (clientSession && clientSession.role === 'Approver') fetchApproverTickets(); } catch (e) { alert('Error submitting ticket. Try without attachment if it persists.'); }
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false;
+}
+
+// ==========================================
+// KNOWLEDGE BASE ENGINE
+// ==========================================
+function toggleKB(btn) {
+    const item = btn.parentElement;
+    document.querySelectorAll('.kb-item').forEach(el => { if (el !== item) { const content = el.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); const icon = el.querySelector('i.kb-icon'); if (icon) icon.classList.remove('rotate-180'); } });
+    const content = item.querySelector('.kb-item-content'); const icon = item.querySelector('i.kb-icon');
+    if (content.classList.contains('hidden')) { content.classList.remove('hidden'); icon.classList.add('rotate-180'); } else { content.classList.add('hidden'); icon.classList.remove('rotate-180'); }
+}
+function filterKB(e) {
+    const input = document.getElementById('kbSearchInput').value.toLowerCase(); const items = document.querySelectorAll('.kb-item'); let found = false;
+    items.forEach(item => { if (item.innerText.toLowerCase().includes(input)) { item.style.display = "block"; found = true; } else { item.style.display = "none"; const content = item.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); } });
+    document.getElementById('kbNoResults').style.display = (!found && input.trim() !== '') ? 'block' : 'none';
+    if (e && e.key === 'Enter' && input.trim() !== '') searchGoogle();
+}
+function searchGoogle() {
+    const query = document.getElementById('kbSearchInput').value.trim();
+    if (query) window.open('https://www.google.com/search?q=' + encodeURIComponent(query + " troubleshooting IT support"), '_blank');
+}
+
+// ==========================================
+// ANALYTICS & EXPORT ENGINE
+// ==========================================
+function updateChart(tickets) {
+    const ctx = document.getElementById('monthlyChart'); if (!ctx) return;
+    const monthlyCounts = {};
+    tickets.forEach(t => { try { const d = new Date(t.date); const monthYear = d.toLocaleString('default', { month: 'short', year: 'numeric' }); if (monthYear !== "Invalid Date") { monthlyCounts[monthYear] = (monthlyCounts[monthYear] || 0) + 1; } } catch (e) { } });
+    const labels = Object.keys(monthlyCounts).sort((a, b) => new Date(a) - new Date(b)); const data = labels.map(l => monthlyCounts[l]);
+    chartDataExport = labels.map((l, i) => ({ Month: l, Total_Tickets: data[i] }));
+    if (monthlyChartInstance) monthlyChartInstance.destroy();
+    monthlyChartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'line', data: { labels: labels, datasets: [{ label: 'Service Requests', data: data, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.08)', borderWidth: 3, fill: true, tension: 0.3, pointBackgroundColor: '#2563eb', pointRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } } } }
+    });
+}
+
+function renderCompanyGrid() {
+    const grid = document.getElementById('companyCardsGrid'); if (!grid) return;
+    const comps = [...new Set(nocDashboardTickets.map(t => t.company).filter(Boolean))]; let html = '';
+    comps.forEach(c => {
+        let tCount = nocDashboardTickets.filter(t => t.company === c).length;
+        html += `<div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"><div class="flex items-center gap-4"><div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold border border-blue-100"><i class="fa-solid fa-building"></i></div><div><h4 class="font-black text-slate-800 text-sm">${escapeHTML(c)}</h4><p class="text-xs text-slate-500 font-medium">Active Infrastructure</p></div></div><h3 class="text-2xl font-black text-blue-600">${tCount}</h3></div>`;
+    });
+    grid.innerHTML = html || '<p class="text-slate-500 text-sm">No ticket data available.</p>';
+}
+
+function exportGlobalQueueExcel() {
+    if (nocDashboardTickets.length === 0) return alert("No data to export.");
+    const cleanData = nocDashboardTickets.map(t => ({ "Ticket ID": t.id, "Date": t.date, "Company": t.company, "Requester": t.name, "Email": t.email, "Phone": t.phone, "Type": t.request_type, "Category": t.category, "Priority": t.priority, "Asset/Host": t.asset, "Subject": t.subject, "Status": t.status, "Assigned To": t.assigned_to, "Remote ID": t.remote_support }));
+    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Global Queue"); XLSX.writeFile(wb, "SpreadIT_GlobalQueue.xlsx");
+}
+
+function exportFullRawTickets() {
+    if (nocDashboardTickets.length === 0) return alert("No data to export.");
+    const cleanData = nocDashboardTickets.map(t => { let d = { ...t }; delete d.chat_history; delete d.fileData; return d; });
+    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Raw Tickets Data"); XLSX.writeFile(wb, "SpreadIT_Raw_Tickets_Data.xlsx");
+}
+
+function exportChartExcel() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    const ws = XLSX.utils.json_to_sheet(chartDataExport); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Monthly Analytics"); XLSX.writeFile(wb, "SpreadIT_Monthly_Analytics.xlsx");
+}
+
+function exportChartPPT() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    let pptx = new PptxGenJS(); let slide = pptx.addSlide(); slide.addText("Monthly Ticketing Analytics", { x: 0.5, y: 0.5, fontSize: 24, color: '363636', bold: true });
+    let tableData = [["Month", "Total Tickets"]]; chartDataExport.forEach(r => tableData.push([r.Month, r.Total_Tickets]));
+    slide.addTable(tableData, { x: 0.5, y: 1.5, w: 8, fill: 'F1F1F1', fontSize: 14, color: '363636' }); pptx.writeFile({ fileName: "SpreadIT_Analytics.pptx" });
+}
+
+function exportChartPDF() {
+    if (chartDataExport.length === 0) return alert("No chart data to export.");
+    const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(20); doc.text("Monthly Ticketing Analytics", 14, 22); doc.setFontSize(12);
+    let startY = 40; doc.text("Month", 14, startY); doc.text("Total Tickets", 80, startY); startY += 10;
+    chartDataExport.forEach(r => { doc.text(String(r.Month), 14, startY); doc.text(String(r.Total_Tickets), 80, startY); startY += 10; });
+    doc.save("SpreadIT_Analytics.pdf");
 }
