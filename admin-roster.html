@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infra Roster | Spread Technical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="flex flex-col min-h-screen font-sans antialiased bg-slate-50">
+    
+    <header class="glass-header sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-md border border-blue-500/50"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="border-l-2 border-slate-300 pl-4">
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">SPREAD TECHNICAL</h1>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">IT Service Management</p>
+                </div>
+            </div>
+            <button onclick="logoutGlobal()" id="globalLogoutBtn" class="bg-rose-50 border border-rose-200 text-rose-600 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-rose-100 transition-all flex items-center gap-2 shadow-sm hidden"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
+        
+        <!-- NEW 6-TAB NAVIGATION -->
+        <div class="admin-nav-container mb-10 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
+            <button onclick="switchNocTab('all')" id="nocTab-all" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-layer-group"></i> Global Queue</button>
+            <button onclick="switchNocTab('visits')" id="nocTab-visits" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-map-location-dot"></i> Field Visits</button>
+            <button onclick="switchNocTab('inventory')" id="nocTab-inventory" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-laptop-medical"></i> Register Asset</button>
+            <button onclick="switchNocTab('roster')" id="nocTab-roster" class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-server"></i> Infra Roster</button>
+            <button onclick="switchNocTab('analytics')" id="nocTab-analytics" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-chart-pie"></i> Analytics & Exports</button>
+            <button onclick="switchNocTab('admin')" id="nocTab-admin" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-users-gear"></i> Admin Management</button>
+        </div>
+
+        <div class="flex flex-col gap-8 w-full max-w-[1400px] mx-auto animate-fade-in">
+            <!-- INVENTORY GRID ONLY -->
+            <div class="glass-panel rounded-[32px] p-8 flex flex-col shadow-md bg-white mb-10 border-t-4 border-indigo-500">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
+                    <div>
+                        <h3 class="font-black text-slate-800 text-3xl whitespace-nowrap"><i class="fa-solid fa-server text-blue-600 mr-3"></i> Infrastructure Roster</h3>
+                        <p class="text-xs text-slate-500 font-bold mt-2 tracking-wider uppercase">View and export corporate hardware assets.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end items-center">
+                        <select id="inventoryCompanyFilter" onchange="updateInventoryUserFilter(); renderInventory();" class="px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-inner"><option value="All">All Companies</option></select>
+                        <select id="inventoryUserFilter" onchange="renderInventory()" class="px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-inner"><option value="All">All Users</option></select>
+                        <button onclick="fetchInventory()" class="w-11 h-11 flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-600 rounded-full hover:bg-white transition active:scale-95 shadow-sm" title="Refresh Inventory"><i class="fa-solid fa-rotate"></i></button>
+                        <button onclick="exportInventoryExcel()" class="px-5 py-2.5 bg-emerald-600 text-white border border-emerald-500 font-bold text-sm rounded-full hover:bg-emerald-500 transition active:scale-95 shadow-md flex items-center gap-2"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+                    </div>
+                </div>
+                <div id="inventoryContainer" class="grid grid-cols-1 xl:grid-cols-2 gap-6 overflow-y-auto max-h-[1000px] pr-2 pb-10"></div>
+            </div>
+        </div>
+    </main>
+    <script src="assets/app.js"></script>
+</body>
+</html>
