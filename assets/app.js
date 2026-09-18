@@ -120,10 +120,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     validateSession();
 
-    if (path.includes('client-dashboard.html') && !clientSession) goTo('client-login.html');
-    if (path.includes('admin-') && !IT_ROLE) goTo('admin-login.html');
+    // --- 🔴 PROTECTED ROUTING ---
+    // Client Protection
+    if (path.includes('client-dashboard.html') && !clientSession) return goTo('client-login.html');
+    if (path.includes('client-login.html') && clientSession) return goTo('client-dashboard.html');
 
-    // Client Init
+    // Admin Protection (Ignores admin-login.html to prevent infinite loops)
+    if (path.includes('admin-') && !path.includes('admin-login.html') && !IT_ROLE) return goTo('admin-login.html');
+    if (path.includes('admin-login.html') && IT_ROLE) return goTo('admin-dashboard.html');
+    // ----------------------------
+
+    // Client Dashboard Init
     if (document.getElementById('clientDashboardView')) {
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
         document.getElementById('clientWelcomeText').innerText = `Logged in as ${clientSession.email}`;
@@ -388,7 +395,7 @@ async function loadUniversalTable(sheetName) {
 }
 
 // ==========================================
-// AUTHENTICATION
+// AUTHENTICATION ROUTES
 // ==========================================
 async function handleClientLogin(e) {
     e.preventDefault();
@@ -1519,6 +1526,7 @@ function openEditCorpUserModal(email, currentRole, currentManager, currentCompan
     document.getElementById('editCorpUserEmail').value = email; document.getElementById('editCorpUserRole').value = currentRole || 'Client'; document.getElementById('editCorpUserPhone').value = currentPhone || '';
     if (currentPhone) document.getElementById('editCorpUserPhone').classList.add('has-val'); else document.getElementById('editCorpUserPhone').classList.remove('has-val');
     
+    // Clear password reset field
     document.getElementById('editCorpUserPassword').value = '';
     document.getElementById('editCorpUserPassword').classList.remove('has-val');
 
@@ -1569,6 +1577,7 @@ function openEditITStaffModal(email, currentRole, currentPhone, currentTelegram)
     document.getElementById('editITStaffPhone').value = currentPhone || ''; 
     document.getElementById('editITStaffTelegram').value = currentTelegram || '';
     
+    // Clear password reset field when opening
     document.getElementById('editITStaffPassword').value = '';
     document.getElementById('editITStaffPassword').classList.remove('has-val');
 
