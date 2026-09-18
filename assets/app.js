@@ -138,7 +138,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('nocDashboardView')) {
         document.getElementById('nocTab-all').innerHTML = `<i class="fa-solid fa-layer-group"></i> Global Queue <span class="text-[10px] ml-2 font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">(${IT_NAME} | ${IT_ROLE})</span>`;
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
-        fetchUsersList().then(() => populateVisitCompanies());
+        
+        // Fetch users and pre-load all dropdowns including Inventory
+        fetchUsersList().then(() => {
+            populateVisitCompanies();
+            populateInventoryCompanies();
+        });
+        
         fetchDashboardTickets();
         startNocPolling();
         fetchAppConfig();
@@ -872,7 +878,6 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
     try { await apiPost({ action: 'update', id: ticketId, status: newStatus, resolve_description: escapeHTML(rca) }); fetchDashboardTickets(); } catch (e) { }
 }
 
-
 // ==========================================
 // ASSET INVENTORY ENGINE (ENTERPRISE SPECS)
 // ==========================================
@@ -939,17 +944,25 @@ function updateInventoryUserFilter() {
 
 function populateInventoryCompanies() {
     const compSelect = document.getElementById('invCompany');
-    if (compSelect && globalRegisteredCompanies.length > 0) {
-        let html = '<option value="" disabled selected>Select Company</option>';
-        globalRegisteredCompanies.forEach(c => { const cName = escapeHTML(c.company || c["company name"] || c.name); html += `<option value="${cName}">${cName}</option>`; });
-        compSelect.innerHTML = html;
-        
-        const filterSelect = document.getElementById('inventoryCompanyFilter');
-        if (filterSelect) {
-            filterSelect.innerHTML = '<option value="All">All Companies</option>' + html.replace('<option value="" disabled selected>Select Company</option>', '');
-        }
-        updateInventoryUserFilter();
+    if (!compSelect) return; // Failsafe if not on the page
+    
+    // Inject default placeholder so it never appears blank
+    let html = '<option value="" disabled selected>Select Company</option>';
+    
+    if (globalRegisteredCompanies.length > 0) {
+        globalRegisteredCompanies.forEach(c => { 
+            const cName = escapeHTML(c.company || c["company name"] || c.name); 
+            html += `<option value="${cName}">${cName}</option>`; 
+        });
     }
+    
+    compSelect.innerHTML = html;
+    
+    const filterSelect = document.getElementById('inventoryCompanyFilter');
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="All">All Companies</option>' + (globalRegisteredCompanies.length > 0 ? html.replace('<option value="" disabled selected>Select Company</option>', '') : '');
+    }
+    updateInventoryUserFilter();
 }
 
 function filterInventoryUsers() {
@@ -1096,24 +1109,23 @@ async function saveAsset(e) {
     const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
     const adminEmail = compObj ? (compObj.admin_email || '') : '';
 
-    // Collect Hardware Specs
-    const make = document.getElementById('invMake').value || '';
-    const model = document.getElementById('invModel').value.trim();
-    const pBrand = document.getElementById('invProcessorBrand').value || '';
-    const pType = document.getElementById('invProcessorType').value || '';
-    const ram = document.getElementById('invRAM').value || '';
-    const ramType = document.getElementById('invRAMType').value || '';
+    // Collect Hardware Specs safely
+    const make = document.getElementById('invMake') ? document.getElementById('invMake').value : '';
+    const modelInput = document.getElementById('invModel');
+    const model = modelInput ? modelInput.value.trim() : '';
     
-    // Primary Storage
-    const pCap = document.getElementById('invPrimaryStorageCap').value || '';
-    const pTypeStore = document.getElementById('invPrimaryStorageType').value || '';
+    const pBrand = document.getElementById('invProcessorBrand') ? document.getElementById('invProcessorBrand').value : '';
+    const pType = document.getElementById('invProcessorType') ? document.getElementById('invProcessorType').value : '';
+    const ram = document.getElementById('invRAM') ? document.getElementById('invRAM').value : '';
+    const ramType = document.getElementById('invRAMType') ? document.getElementById('invRAMType').value : '';
     
-    // Secondary Storage
-    const sCap = document.getElementById('invSecondaryStorageCap').value || '';
+    const pCap = document.getElementById('invPrimaryStorageCap') ? document.getElementById('invPrimaryStorageCap').value : '';
+    const pTypeStore = document.getElementById('invPrimaryStorageType') ? document.getElementById('invPrimaryStorageType').value : '';
+    const sCap = document.getElementById('invSecondaryStorageCap') ? document.getElementById('invSecondaryStorageCap').value : '';
     const sTypeStore = document.getElementById('invSecondaryStorageType') ? document.getElementById('invSecondaryStorageType').value : '';
 
-    const gpu = document.getElementById('invGPU').value || '';
-    const display = document.getElementById('invDisplay').value || '';
+    const gpu = document.getElementById('invGPU') ? document.getElementById('invGPU').value : '';
+    const display = document.getElementById('invDisplay') ? document.getElementById('invDisplay').value : '';
     
     const combinedBrandModel = `${make} ${model}`.trim() || 'Custom Build';
     
@@ -1127,7 +1139,8 @@ async function saveAsset(e) {
     if (gpu) specsArr.push(`GPU: ${gpu}`);
     if (display) specsArr.push(`Display: ${display}`);
     
-    let customNotes = document.getElementById('invNotes').value.trim();
+    const notesInput = document.getElementById('invNotes');
+    let customNotes = notesInput ? notesInput.value.trim() : '';
     let finalNotes = specsArr.length > 0 ? `[SPECS]\n${specsArr.join(' | ')}\n\n[NOTES]\n${customNotes}` : customNotes;
 
     const payload = {
@@ -1146,9 +1159,9 @@ async function saveAsset(e) {
     try { 
         await apiPost(payload); 
         document.getElementById('invAssetTag').value = '';
-        document.getElementById('invModel').value = '';
+        if (modelInput) modelInput.value = '';
         document.getElementById('invSerialNumber').value = '';
-        document.getElementById('invNotes').value = '';
+        if (notesInput) notesInput.value = '';
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
         fetchInventory(); 
@@ -1465,6 +1478,7 @@ function openEditCorpUserModal(email, currentRole, currentManager, currentCompan
     document.getElementById('editCorpUserEmail').value = email; document.getElementById('editCorpUserRole').value = currentRole || 'Client'; document.getElementById('editCorpUserPhone').value = currentPhone || '';
     if (currentPhone) document.getElementById('editCorpUserPhone').classList.add('has-val'); else document.getElementById('editCorpUserPhone').classList.remove('has-val');
     
+    // Clear password reset field
     document.getElementById('editCorpUserPassword').value = '';
     document.getElementById('editCorpUserPassword').classList.remove('has-val');
 
@@ -1515,6 +1529,7 @@ function openEditITStaffModal(email, currentRole, currentPhone, currentTelegram)
     document.getElementById('editITStaffPhone').value = currentPhone || ''; 
     document.getElementById('editITStaffTelegram').value = currentTelegram || '';
     
+    // Clear password reset field when opening
     document.getElementById('editITStaffPassword').value = '';
     document.getElementById('editITStaffPassword').classList.remove('has-val');
 
