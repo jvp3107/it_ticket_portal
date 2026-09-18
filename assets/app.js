@@ -4,7 +4,8 @@
  */
 const DB_CONFIG = {
     ticketApiUrl: "https://script.google.com/macros/s/AKfycbzUtwju4tELvUTYBlVCWYTFp5LZ7cCkNbhWFzy081HHhABPPLzFUS4xjjBvhIO699wS/exec",
-    userApiUrl: "https://script.google.com/macros/s/AKfycbz7tA_SYkLXzIxmeHEXFMQy70VB47cZrGjsh-qHjjjOvJVRHPBFCTAUI0QerWQKSXKZKQ/exec"
+    userApiUrl: "https://script.google.com/macros/s/AKfycbz7tA_SYkLXzIxmeHEXFMQy70VB47cZrGjsh-qHjjjOvJVRHPBFCTAUI0QerWQKSXKZKQ/exec",
+    apiKey: "SpreadIT_Secure_Key_2026!"
 };
 
 const STATUS_FLOW = ["Pending Approval", "Monitoring", "Assigned", "Working", "Resolved"];
@@ -40,13 +41,14 @@ function goTo(pageUrl) {
 }
 
 async function apiPost(payload) {
+    payload.api_key = DB_CONFIG.apiKey;
+
     const userActions = [
         "save_user", "register_client", "register_it_staff", "update_user_profile",
         "get_users", "login_admin", "login_client", "delete_user", "reset_password",
         "get_companies", "save_company", "delete_company"
     ];
     
-    // Default to Ticket API for Tickets AND Assets
     let targetUrl = DB_CONFIG.ticketApiUrl;
 
     if (userActions.includes(payload.action)) {
@@ -122,15 +124,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     validateSession();
 
-    // Client Protection
     if (path.includes('client-dashboard.html') && !clientSession) return goTo('client-login.html');
     if (path.includes('client-login.html') && clientSession) return goTo('client-dashboard.html');
 
-    // Admin Protection
     if (path.includes('admin-') && !path.includes('admin-login.html') && !IT_ROLE) return goTo('admin-login.html');
     if (path.includes('admin-login.html') && IT_ROLE) return goTo('admin-dashboard.html');
 
-    // Client Dashboard Init
     if (document.getElementById('clientDashboardView')) {
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
         document.getElementById('clientWelcomeText').innerText = `Logged in as ${clientSession.email}`;
@@ -141,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAppConfig();
     }
 
-    // Admin Multi-Page Init
     if (document.querySelector('.admin-nav-container')) {
         document.getElementById('globalLogoutBtn').classList.remove('hidden');
         fetchAppConfig();
@@ -170,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchDashboardTickets();
             startNocPolling();
         } else if (currentTab === 'inventory') {
-            fetchUsersList().then(() => { populateInventoryCompanies(); fetchInventory(); });
+            fetchUsersList().then(() => { populateInventoryCompanies(); populateProcessorDropdown(); fetchInventory(); });
         } else if (currentTab === 'visits') {
             fetchUsersList().then(() => populateVisitCompanies()); fetchVisits();
         } else if (currentTab === 'analytics') {
@@ -922,48 +920,30 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// ASSET INVENTORY ENGINE
+// ASSET INVENTORY ENGINE (EXPANDED)
 // ==========================================
-function updateProcessorModels() {
-    const brand = document.getElementById('invProcessorBrand').value;
-    const modelSelect = document.getElementById('invProcessorType');
-    if (!modelSelect) return;
+function populateProcessorDropdown() {
+    const dataList = document.getElementById('processorList');
+    if (!dataList) return;
     
-    let html = '<option value="" disabled selected>Select Model</option>';
+    // Comprehensive list of common Enterprise processors for autocomplete
+    const processors = [
+        "Intel Core Ultra 9 285K", "Intel Core Ultra 7 265K", "Intel Core Ultra 5 245K",
+        "Intel Core Ultra 9 185H", "Intel Core Ultra 7 165H", "Intel Core Ultra 7 155H", 
+        "Intel Core Ultra 7 165U", "Intel Core Ultra 7 155U", "Intel Core Ultra 5 135H", 
+        "Intel Core Ultra 5 125H", "Intel Core Ultra 5 135U", "Intel Core Ultra 5 125U", 
+        "Intel Core i9-14900K", "Intel Core i7-14700K", "Intel Core i5-14600K",
+        "Intel Core i9-13900K", "Intel Core i7-13700K", "Intel Core i5-13600K",
+        "AMD Ryzen 9 7950X", "AMD Ryzen 9 7900X", "AMD Ryzen 7 7800X3D", 
+        "AMD Ryzen 7 7700X", "AMD Ryzen 5 7600X", "AMD Ryzen Threadripper PRO",
+        "Apple M3 Max", "Apple M3 Pro", "Apple M3",
+        "Apple M2 Max", "Apple M2 Pro", "Apple M2",
+        "Apple M1 Max", "Apple M1 Pro", "Apple M1"
+    ];
     
-    if (brand === 'Intel') {
-        html += `<optgroup label="Intel Core Ultra">
-                    <option value="Core Ultra 9">Core Ultra 9</option>
-                    <option value="Core Ultra 7">Core Ultra 7</option>
-                    <option value="Core Ultra 5">Core Ultra 5</option>
-                 </optgroup>
-                 <optgroup label="Intel Core (Legacy)">
-                    <option value="Core i9">Core i9</option>
-                    <option value="Core i7">Core i7</option>
-                    <option value="Core i5">Core i5</option>
-                    <option value="Core i3">Core i3</option>
-                    <option value="Xeon">Xeon (Workstation)</option>
-                 </optgroup>`;
-    } else if (brand === 'AMD') {
-        html += `<optgroup label="Ryzen Series">
-                    <option value="Ryzen 9">Ryzen 9</option>
-                    <option value="Ryzen 7">Ryzen 7</option>
-                    <option value="Ryzen 5">Ryzen 5</option>
-                    <option value="Ryzen 3">Ryzen 3</option>
-                 </optgroup>
-                 <optgroup label="Pro/Workstation">
-                    <option value="Threadripper">Threadripper</option>
-                    <option value="EPYC">EPYC</option>
-                 </optgroup>`;
-    } else if (brand === 'Apple') {
-        html += `<optgroup label="Apple Silicon">
-                    <option value="M3 Max / Pro">M3 Series</option>
-                    <option value="M2 Max / Pro">M2 Series</option>
-                    <option value="M1 Max / Pro">M1 Series</option>
-                 </optgroup>`;
-    }
-    
-    modelSelect.innerHTML = html;
+    let html = '';
+    processors.forEach(p => { html += `<option value="${p}">`; });
+    dataList.innerHTML = html;
 }
 
 function updateInventoryUserFilter() {
@@ -973,23 +953,17 @@ function updateInventoryUserFilter() {
     
     let html = '<option value="All">All Users</option>';
     let users = globalUsersList;
-    if(compFilter !== 'All') {
-        users = globalUsersList.filter(u => u.company === compFilter);
-    }
+    if(compFilter !== 'All') { users = globalUsersList.filter(u => u.company === compFilter); }
     
     html += `<option value="IT Stock">IT Stock (Unassigned)</option>`;
-    users.forEach(u => {
-        html += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)}</option>`;
-    });
-    
+    users.forEach(u => { html += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)}</option>`; });
     userFilterSelect.innerHTML = html;
 }
 
 function populateInventoryCompanies() {
     const compSelect = document.getElementById('invCompany');
     if (!compSelect) return; 
-    
-    let html = '<option value="" disabled selected>Select Company</option>';
+    let html = '<option value="" disabled selected></option>';
     
     if (globalRegisteredCompanies.length > 0) {
         globalRegisteredCompanies.forEach(c => { 
@@ -997,26 +971,13 @@ function populateInventoryCompanies() {
             html += `<option value="${cName}">${cName}</option>`; 
         });
     }
-    
     compSelect.innerHTML = html;
     
     const filterSelect = document.getElementById('inventoryCompanyFilter');
     if (filterSelect) {
-        filterSelect.innerHTML = '<option value="All">All Companies</option>' + (globalRegisteredCompanies.length > 0 ? html.replace('<option value="" disabled selected>Select Company</option>', '') : '');
+        filterSelect.innerHTML = '<option value="All">All Companies</option>' + (globalRegisteredCompanies.length > 0 ? html.replace('<option value="" disabled selected></option>', '') : '');
     }
     updateInventoryUserFilter();
-}
-
-function filterInventoryUsers() {
-    const selectedComp = document.getElementById('invCompany').value;
-    const userSelect = document.getElementById('invAssignedUser');
-    let opts = `<option value="IT Stock">Unassigned (IT Stock)</option>`;
-    
-    if (selectedComp) {
-        const users = globalUsersList.filter(u => u.company === selectedComp);
-        users.forEach(u => { opts += `<option value="${escapeHTML(u.name)}">${escapeHTML(u.name)} (${escapeHTML(u.email)})</option>`; });
-    }
-    if (userSelect) userSelect.innerHTML = opts;
 }
 
 async function fetchInventory() {
@@ -1037,7 +998,7 @@ function renderInventory() {
     
     let filtered = globalInventory.filter(i => 
         (companyFilter === 'All' || i.company === companyFilter) &&
-        (userFilter === 'All' || i.assigned_to === userFilter)
+        (userFilter === 'All' || i.logged_in_user === userFilter)
     );
 
     if (filtered.length === 0) { 
@@ -1048,50 +1009,38 @@ function renderInventory() {
     let html = '';
     filtered.forEach(item => {
         let statColor = item.status === 'Active' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : item.status === 'In Repair' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200';
-        
-        let notesDisplay = '';
-        let specsDisplay = '';
+        let combinedMakeModel = `${escapeHTML(item.make || '')} ${escapeHTML(item.model || '')}`.trim() || 'Custom Infrastructure';
 
-        if (item.notes) {
-            if (item.notes.includes('[SPECS]')) {
-                let parts = item.notes.split('[NOTES]');
-                let specsRaw = parts[0].replace('[SPECS]', '').trim();
-                let notesRaw = parts[1] ? parts[1].trim() : '';
-                
-                let specChips = specsRaw.split('|').map(s => `<span class="inline-block px-1.5 py-0.5 bg-white rounded border border-indigo-100 text-indigo-700 whitespace-nowrap mb-1 mr-1">${escapeHTML(s.trim())}</span>`).join('');
-                
-                specsDisplay = `<div class="mt-3 bg-indigo-50/50 border border-indigo-100 rounded-lg p-2.5 text-[9px] font-bold shadow-inner leading-tight"><div class="text-indigo-400 mb-1 uppercase tracking-widest"><i class="fa-solid fa-microchip"></i> Hardware</div>${specChips}</div>`;
-                
-                if (notesRaw) {
-                    notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100 leading-relaxed">${escapeHTML(notesRaw)}</p>`;
-                }
-            } else {
-                notesDisplay = `<p class="text-[10px] text-slate-500 italic mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">${escapeHTML(item.notes)}</p>`;
-            }
-        }
-        
         html += `
         <div class="p-6 bg-white border border-slate-200 rounded-[24px] flex flex-col hover:shadow-lg transition-all gap-3 relative overflow-hidden group">
             <div class="flex justify-between items-start">
-                <h4 class="font-black text-base text-slate-800 flex items-center gap-2">
-                    ${escapeHTML(item.brand_model)} 
-                </h4>
+                <h4 class="font-black text-base text-slate-800 flex items-center gap-2 truncate pr-4" title="${combinedMakeModel}">${combinedMakeModel}</h4>
                 <span class="text-[10px] text-slate-600 font-bold whitespace-nowrap bg-slate-100 px-2.5 py-1 rounded shadow-sm border border-slate-200">${escapeHTML(item.asset_tag)}</span>
             </div>
             
             <div class="flex flex-wrap gap-2">
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold border text-indigo-700 bg-indigo-50 border-indigo-200 uppercase tracking-widest">${escapeHTML(item.device_type)}</span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold border text-indigo-700 bg-indigo-50 border-indigo-200 uppercase tracking-widest"><i class="fa-solid fa-building mr-1"></i> ${escapeHTML(item.company)}</span>
                 <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statColor} uppercase tracking-widest">${escapeHTML(item.status)}</span>
             </div>
             
-            <div class="text-xs text-slate-600 font-medium space-y-1.5 mt-1 border-t border-slate-100 pt-3">
-                <p class="flex items-center"><i class="fa-solid fa-building w-5 text-slate-400"></i> ${escapeHTML(item.company)}</p>
-                <p class="flex items-center"><i class="fa-solid fa-user w-5 text-slate-400"></i> <span class="font-bold text-blue-600">${escapeHTML(item.assigned_to)}</span></p>
-                <p class="flex items-center text-[10px] text-slate-500 mt-1"><i class="fa-solid fa-barcode w-5 text-slate-300"></i> SN: ${escapeHTML(item.serial_number || 'N/A')}</p>
+            <div class="mt-4 border-t border-slate-100 pt-4">
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-4 text-[10px] text-slate-600">
+                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Hostname</span><span class="font-semibold text-slate-800">${escapeHTML(item.hostname || 'N/A')}</span></div>
+                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Logged-In User</span><span class="font-semibold text-slate-800">${escapeHTML(item.logged_in_user || 'N/A')}</span></div>
+                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">System Type</span><span class="font-semibold text-slate-800">${escapeHTML(item.system_type || 'N/A')}</span></div>
+                    
+                    <div class="col-span-2 lg:col-span-3"><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Processor</span><span class="font-semibold text-indigo-700">${escapeHTML(item.processor || 'N/A')} <span class="text-slate-400 font-normal">(${escapeHTML(item.cores_threads || 'N/A')})</span></span></div>
+                    
+                    <div><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">RAM</span><span class="font-semibold text-slate-800">${escapeHTML(item.total_ram || 'N/A')}</span></div>
+                    <div class="col-span-2"><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Graphics</span><span class="font-semibold text-slate-800 truncate block" title="${escapeHTML(item.graphics_card)}">${escapeHTML(item.graphics_card || 'N/A')}</span></div>
+                    
+                    <div class="col-span-2 lg:col-span-3"><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Storage Disks</span><span class="font-semibold text-slate-800 break-words">${escapeHTML(item.storage_disks || 'N/A')}</span></div>
+                    
+                    <div class="col-span-2 lg:col-span-3"><span class="text-slate-400 block uppercase tracking-wider text-[8px] font-bold mb-0.5">Operating System</span><span class="font-semibold text-slate-800">${escapeHTML(item.os_name || 'N/A')} <span class="text-slate-400 font-normal">| ${escapeHTML(item.os_version || 'N/A')} | ${escapeHTML(item.architecture || 'N/A')}</span></span></div>
+                </div>
             </div>
 
-            ${specsDisplay}
-            ${notesDisplay}
+            ${item.notes ? `<p class="text-[10px] text-slate-500 italic mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">${escapeHTML(item.notes)}</p>` : ''}
 
             <button onclick="deleteAsset('${item.asset_tag}')" class="absolute bottom-4 right-4 text-rose-300 hover:text-rose-600 transition text-sm opacity-0 group-hover:opacity-100" title="Delete Asset"><i class="fa-solid fa-trash"></i></button>
         </div>`;
@@ -1107,31 +1056,31 @@ function exportInventoryExcel() {
     
     let filtered = globalInventory.filter(i => 
         (companyFilter === 'All' || i.company === companyFilter) &&
-        (userFilter === 'All' || i.assigned_to === userFilter)
+        (userFilter === 'All' || i.logged_in_user === userFilter)
     );
 
     if (filtered.length === 0) return alert("No data matches the current filters.");
 
     const cleanData = filtered.map(item => {
-        let cleanSpecs = "N/A";
-        let cleanNotes = item.notes || "";
-        
-        if (item.notes && item.notes.includes('[SPECS]')) {
-            let parts = item.notes.split('[NOTES]');
-            cleanSpecs = parts[0].replace('[SPECS]', '').replace(/\|/g, ', ').trim();
-            cleanNotes = parts[1] ? parts[1].trim() : '';
-        }
-
         return {
             "Asset Tag": item.asset_tag,
+            "Hostname": item.hostname,
             "Client Company": item.company,
-            "Assigned User": item.assigned_to,
-            "Device Type": item.device_type,
-            "Brand & Model": item.brand_model,
+            "Logged-in User": item.logged_in_user,
+            "Make / Manufacturer": item.make,
+            "Model": item.model,
+            "System Type": item.system_type,
             "Serial Number": item.serial_number,
-            "Hardware Specs": cleanSpecs,
+            "OS Name": item.os_name,
+            "OS Version / Build": item.os_version,
+            "Architecture": item.architecture,
+            "Processor": item.processor,
+            "Cores / Threads": item.cores_threads,
+            "Graphics Card": item.graphics_card,
+            "Total RAM": item.total_ram,
+            "Storage Disks": item.storage_disks,
             "Status": item.status,
-            "Additional Notes": cleanNotes
+            "Notes": item.notes
         };
     });
 
@@ -1150,62 +1099,40 @@ async function saveAsset(e) {
     const compObj = globalRegisteredCompanies.find(c => (c.company || c["company name"] || c.name) === companyName);
     const adminEmail = compObj ? (compObj.admin_email || '') : '';
 
-    const make = document.getElementById('invMake') ? document.getElementById('invMake').value : '';
-    const modelInput = document.getElementById('invModel');
-    const model = modelInput ? modelInput.value.trim() : '';
-    
-    const pBrand = document.getElementById('invProcessorBrand') ? document.getElementById('invProcessorBrand').value : '';
-    const pType = document.getElementById('invProcessorType') ? document.getElementById('invProcessorType').value : '';
-    const ram = document.getElementById('invRAM') ? document.getElementById('invRAM').value : '';
-    const ramType = document.getElementById('invRAMType') ? document.getElementById('invRAMType').value : '';
-    
-    const pCap = document.getElementById('invPrimaryStorageCap') ? document.getElementById('invPrimaryStorageCap').value : '';
-    const pTypeStore = document.getElementById('invPrimaryStorageType') ? document.getElementById('invPrimaryStorageType').value : '';
-    const sCap = document.getElementById('invSecondaryStorageCap') ? document.getElementById('invSecondaryStorageCap').value : '';
-    const sTypeStore = document.getElementById('invSecondaryStorageType') ? document.getElementById('invSecondaryStorageType').value : '';
-
-    const gpu = document.getElementById('invGPU') ? document.getElementById('invGPU').value : '';
-    const display = document.getElementById('invDisplay') ? document.getElementById('invDisplay').value : '';
-    
-    const combinedBrandModel = `${make} ${model}`.trim() || 'Custom Build';
-    
-    let specsArr = [];
-    if (pBrand || pType) specsArr.push(`CPU: ${pBrand} ${pType}`.trim());
-    if (ram || ramType) specsArr.push(`RAM: ${ram} ${ramType}`.trim());
-    if (pCap || pTypeStore) specsArr.push(`OS Drive: ${pCap} ${pTypeStore}`.trim());
-    if (sCap && sCap !== 'None') specsArr.push(`Data Drive: ${sCap} ${sTypeStore}`.trim());
-    if (gpu) specsArr.push(`GPU: ${gpu}`);
-    if (display) specsArr.push(`Display: ${display}`);
-    
-    const notesInput = document.getElementById('invNotes');
-    let customNotes = notesInput ? notesInput.value.trim() : '';
-    let finalNotes = specsArr.length > 0 ? `[SPECS]\n${specsArr.join(' | ')}\n\n[NOTES]\n${customNotes}` : customNotes;
-
     const payload = {
         action: 'save_company_asset', 
         asset_tag: document.getElementById('invAssetTag').value.trim(),
+        hostname: document.getElementById('invHostname').value.trim(),
         company: companyName,
-        assigned_to: document.getElementById('invAssignedUser').value,
-        device_type: document.getElementById('invDeviceType').value,
-        brand_model: combinedBrandModel,
+        logged_in_user: document.getElementById('invLoggedInUser').value.trim(),
+        make: document.getElementById('invMake').value.trim(),
+        model: document.getElementById('invModel').value.trim(),
+        system_type: document.getElementById('invSystemType').value,
         serial_number: document.getElementById('invSerialNumber').value.trim(),
+        os_name: document.getElementById('invOsName').value.trim(),
+        os_version: document.getElementById('invOsVersion').value.trim(),
+        architecture: document.getElementById('invArchitecture').value,
+        processor: document.getElementById('invProcessor').value.trim(),
+        cores_threads: document.getElementById('invCoresThreads').value.trim(),
+        graphics_card: document.getElementById('invGraphics').value.trim(),
+        total_ram: document.getElementById('invRAM').value.trim(),
+        storage_disks: document.getElementById('invStorage').value.trim(),
         status: document.getElementById('invStatus').value,
-        notes: finalNotes,
+        notes: document.getElementById('invNotes').value.trim(),
         admin_email: adminEmail
     };
 
     try { 
         await apiPost(payload); 
         document.getElementById('invAssetTag').value = '';
-        if (modelInput) modelInput.value = '';
+        document.getElementById('invHostname').value = '';
         document.getElementById('invSerialNumber').value = '';
-        if (notesInput) notesInput.value = '';
         document.querySelectorAll('#noc-inventoryView .itsm-input').forEach(i => i.classList.remove('has-val'));
         
         fetchInventory(); 
         alert("Asset successfully provisioned in the directory."); 
     } catch (e) { alert("Network error saving asset."); }
-    btn.innerHTML = "Provision Asset"; btn.disabled = false;
+    btn.innerHTML = "<i class='fa-solid fa-server mr-2'></i> Provision Asset in Database"; btn.disabled = false;
 }
 
 async function deleteAsset(assetTag) {
