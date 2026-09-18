@@ -43,14 +43,16 @@ async function apiPost(payload) {
     const userActions = [
         "save_user", "register_client", "register_it_staff", "update_user_profile",
         "get_users", "login_admin", "login_client", "delete_user", "reset_password",
-        "get_companies", "save_company", "delete_company", "save_company_asset"
+        "get_companies", "save_company", "delete_company"
     ];
+    
+    // Default to Ticket API for Tickets AND Assets
     let targetUrl = DB_CONFIG.ticketApiUrl;
 
     if (userActions.includes(payload.action)) {
         targetUrl = DB_CONFIG.userApiUrl;
     } else if (payload.action === 'db_read' || payload.action === 'db_upsert' || payload.action === 'db_delete') {
-        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings' || payload.target_sheet === 'Inventory' || payload.target_sheet === 'Visits') {
+        if (payload.target_sheet === 'Users' || payload.target_sheet === 'Companies' || payload.target_sheet === 'Settings' || payload.target_sheet === 'Visits') {
             targetUrl = DB_CONFIG.userApiUrl;
         }
     }
@@ -120,15 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     validateSession();
 
-    // --- 🔴 PROTECTED ROUTING ---
     // Client Protection
     if (path.includes('client-dashboard.html') && !clientSession) return goTo('client-login.html');
     if (path.includes('client-login.html') && clientSession) return goTo('client-dashboard.html');
 
-    // Admin Protection (Ignores admin-login.html to prevent infinite loops)
+    // Admin Protection
     if (path.includes('admin-') && !path.includes('admin-login.html') && !IT_ROLE) return goTo('admin-login.html');
     if (path.includes('admin-login.html') && IT_ROLE) return goTo('admin-dashboard.html');
-    // ----------------------------
 
     // Client Dashboard Init
     if (document.getElementById('clientDashboardView')) {
@@ -922,7 +922,7 @@ async function updateAdminTicketStatus(ticketId, newStatus) {
 }
 
 // ==========================================
-// ASSET INVENTORY ENGINE (ENTERPRISE SPECS)
+// ASSET INVENTORY ENGINE
 // ==========================================
 function updateProcessorModels() {
     const brand = document.getElementById('invProcessorBrand').value;
@@ -1021,7 +1021,7 @@ function filterInventoryUsers() {
 
 async function fetchInventory() {
     try {
-        const res = await apiPost({ action: 'db_read', target_sheet: 'Inventory' }); 
+        const res = await apiPost({ action: 'get_inventory' }); 
         const data = await res.json();
         globalInventory = data.data || []; 
         renderInventory();
@@ -1210,7 +1210,7 @@ async function saveAsset(e) {
 
 async function deleteAsset(assetTag) {
     if (!confirm(`Delete asset ${assetTag} permanently?`)) return;
-    try { await apiPost({ action: 'db_delete', target_sheet: 'Inventory', primary_key: 'asset_tag', primary_value: assetTag }); fetchInventory(); } 
+    try { await apiPost({ action: 'delete_asset', asset_tag: assetTag }); fetchInventory(); } 
     catch (e) { alert("Error deleting asset."); }
 }
 
@@ -1526,7 +1526,6 @@ function openEditCorpUserModal(email, currentRole, currentManager, currentCompan
     document.getElementById('editCorpUserEmail').value = email; document.getElementById('editCorpUserRole').value = currentRole || 'Client'; document.getElementById('editCorpUserPhone').value = currentPhone || '';
     if (currentPhone) document.getElementById('editCorpUserPhone').classList.add('has-val'); else document.getElementById('editCorpUserPhone').classList.remove('has-val');
     
-    // Clear password reset field
     document.getElementById('editCorpUserPassword').value = '';
     document.getElementById('editCorpUserPassword').classList.remove('has-val');
 
@@ -1577,7 +1576,6 @@ function openEditITStaffModal(email, currentRole, currentPhone, currentTelegram)
     document.getElementById('editITStaffPhone').value = currentPhone || ''; 
     document.getElementById('editITStaffTelegram').value = currentTelegram || '';
     
-    // Clear password reset field when opening
     document.getElementById('editITStaffPassword').value = '';
     document.getElementById('editITStaffPassword').classList.remove('has-val');
 
@@ -1639,180 +1637,4 @@ async function registerNewAdmin(e) {
 async function deleteCorporateUser(email) {
     if (!confirm(`Delete user ${email}?`)) return;
     try { await apiPost({ action: 'delete_user', email: email }); fetchUsersList(); } catch (e) { alert("Failed to delete user."); }
-}
-
-// ==========================================
-// TICKET SUBMISSION LOGIC
-// ==========================================
-function handleRequestTypeChange() {
-    const reqSelect = document.getElementById('requestType');
-    const reqType = reqSelect ? reqSelect.value : 'Incident';
-    const catSelect = document.getElementById('deviceType');
-
-    if (!catSelect) return;
-
-    const filteredCategories = appConfigData.filter(c => c.type === 'Category' && c.parent === reqType);
-
-    if (filteredCategories.length > 0) {
-        let html = `<option value="" disabled selected>Select Category</option>`;
-        filteredCategories.forEach(c => { html += `<option value="${c.value}">${c.value}</option>`; });
-        catSelect.innerHTML = html;
-    } else {
-        if (reqType === 'Incident') { catSelect.innerHTML = `<option value="" disabled selected>Select Incident Category</option><option value="Authentication/Login">Account & Access</option><option value="Laptop/Desktop">Endpoint Hardware</option><option value="Software/App">Software & Applications</option>`; }
-        else { catSelect.innerHTML = `<option value="" disabled selected>Select Service Category</option><option value="New Asset Setup">New Employee Setup</option><option value="New Device Peripherals">Hardware Request</option>`; }
-    }
-
-    updateFormLogic();
-}
-
-function updateFormLogic() {
-    const reqType = document.getElementById('requestType') ? document.getElementById('requestType').value : 'Incident';
-    const category = document.getElementById('deviceType') ? document.getElementById('deviceType').value : '';
-    const priority = document.getElementById('priority') ? document.getElementById('priority').value : 'Medium';
-
-    const priorityWrapper = document.getElementById('priorityWrapper');
-    const assetTagWrapper = document.getElementById('assetTagWrapper');
-    if (reqType === 'Service') {
-        if (priorityWrapper) priorityWrapper.style.display = 'none';
-        if (assetTagWrapper) assetTagWrapper.style.display = 'none';
-    } else {
-        if (priorityWrapper) priorityWrapper.style.display = 'flex';
-        if (assetTagWrapper) assetTagWrapper.style.display = 'flex';
-    }
-
-    const joineeFields = document.getElementById('newJoineeFields'); const jName = document.getElementById('joineeName'); const jLoc = document.getElementById('joineeLocation');
-    if (category === 'New Asset Setup' && joineeFields) { joineeFields.classList.remove('hidden'); jName.disabled = false; jLoc.disabled = false; } else if (joineeFields) { joineeFields.classList.add('hidden'); jName.disabled = true; jLoc.disabled = true; jName.value = ''; jLoc.value = ''; }
-    const peripheralFields = document.getElementById('newPeripheralFields'); const pList = document.getElementById('peripheralList');
-    if (category === 'New Device Peripherals' && peripheralFields) { peripheralFields.classList.remove('hidden'); pList.disabled = false; } else if (peripheralFields) { peripheralFields.classList.add('hidden'); pList.disabled = true; pList.value = ''; }
-
-    const rsFields = document.getElementById('remoteSupportFields'); const rsId = document.getElementById('remoteId'); const rsPass = document.getElementById('remotePass'); const rApp = document.getElementById('remoteApp');
-    if (reqType === 'Incident' && (category === 'Laptop/Desktop' || category === 'Software/App') && (priority === 'Low' || priority === 'Medium') && rsFields) {
-        rsFields.classList.remove('hidden'); rsId.disabled = false; rsPass.disabled = false; rApp.disabled = false;
-    } else if (rsFields) {
-        rsFields.classList.add('hidden'); rsId.disabled = true; rsPass.disabled = true; rApp.disabled = true; rsId.value = ''; rsPass.value = '';
-    }
-}
-
-function handleTicketForChange() {
-    const isElse = document.getElementById('ticketFor').value === 'Someone Else'; const peerWrapper = document.getElementById('peerWrapper'); const peerSelect = document.getElementById('ticketForPeer'); const tName = document.getElementById('ticketName'); const tEmail = document.getElementById('ticketEmail'); const tPhone = document.getElementById('phoneNumber'); const pLabel = document.getElementById('phoneLabel');
-    if (isElse) {
-        peerWrapper.classList.remove('hidden'); tPhone.required = true; pLabel.innerText = "Contact Number *";
-        let opts = `<option value="" disabled selected></option>`;
-        if (clientSession && clientSession.peers) { clientSession.peers.forEach(p => { if (p.email.toLowerCase() !== clientSession.email.toLowerCase()) { opts += `<option value="${p.email}" data-name="${escapeHTML(p.name)}" data-phone="${escapeHTML(p.phone || '')}">${escapeHTML(p.name)} (${p.email})</option>`; } }); }
-        peerSelect.innerHTML = opts; peerSelect.disabled = false;
-        peerSelect.onchange = () => { const opt = peerSelect.options[peerSelect.selectedIndex]; tName.value = opt.getAttribute('data-name'); tEmail.value = opt.value; tPhone.value = opt.getAttribute('data-phone') || ''; tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val'); };
-        tName.value = ""; tEmail.value = ""; tPhone.value = ""; tName.classList.remove('has-val'); tEmail.classList.remove('has-val'); tPhone.classList.remove('has-val');
-    } else {
-        peerWrapper.classList.add('hidden'); peerSelect.disabled = true; tPhone.required = false; pLabel.innerText = "Contact Number";
-        tName.value = clientSession.name; tEmail.value = clientSession.email; tPhone.value = clientSession.phone || "";
-        tName.classList.add('has-val'); tEmail.classList.add('has-val'); if (tPhone.value) tPhone.classList.add('has-val'); else tPhone.classList.remove('has-val');
-    }
-}
-
-function handleRemoteAppChange() { const app = document.getElementById('remoteApp').value; const passLabel = document.getElementById('remotePassLabel'); if (app === 'AnyDesk') { passLabel.innerText = "Remote Password (Optional)"; } else { passLabel.innerText = "Remote Password"; } }
-
-function toggleNewTicketForm() {
-    const form = document.getElementById('newTicketFormContainer'); form.classList.toggle('hidden');
-    if (!form.classList.contains('hidden')) { handleRequestTypeChange(); if (clientSession) { document.getElementById('ticketCompany').value = clientSession.company; document.getElementById('ticketCompany').classList.add('has-val'); handleTicketForChange(); } }
-}
-
-async function submitTicket(e) {
-    e.preventDefault(); const btn = document.getElementById('submitBtn'); const rsFields = document.getElementById('remoteSupportFields'); const fileInput = document.getElementById('attachmentFile'); let rsAppVal = '', rsIdVal = '', rsPassVal = '';
-    if (!rsFields.classList.contains('hidden')) {
-        rsAppVal = document.getElementById('remoteApp').value; rsIdVal = document.getElementById('remoteId').value.trim(); rsPassVal = document.getElementById('remotePass').value.trim(); const requiresPass = (rsAppVal !== 'AnyDesk');
-        if (!rsIdVal && (!rsPassVal && requiresPass) && (!fileInput || fileInput.files.length === 0)) { alert("ACTION REQUIRED:\n\nFor Low/Medium priority Endpoint Incidents, you MUST either provide your Remote Support credentials OR attach a screenshot of the issue."); return; }
-    }
-    btn.innerHTML = 'Processing...'; btn.disabled = true;
-    const reqType = document.getElementById('requestType').value; const category = document.getElementById('deviceType').value; let desc = document.getElementById('message').value; const contactMethod = document.getElementById('contactMethod').value; const ccEmail = document.getElementById('ticketCC') ? document.getElementById('ticketCC').value.trim() : '';
-    desc = `[Contact via: ${contactMethod}]\n` + (ccEmail ? `[CC: ${ccEmail}]\n\n` : '\n') + desc;
-    let status = (reqType === "Service") ? "Pending Approval" : "Monitoring"; let remoteSupportStr = "N/A";
-    if (!rsFields.classList.contains('hidden') && (rsIdVal || rsPassVal)) { remoteSupportStr = `App: ${rsAppVal} | ID: ${rsIdVal || 'N/A'} | Pass: ${rsPassVal || 'Optional'}`; }
-    if (category === 'New Asset Setup') { const jName = document.getElementById('joineeName').value; const jLoc = document.getElementById('joineeLocation').value; desc = `[NEW JOINEE SETUP]\nJoinee Name: ${jName}\nLocation/Desk: ${jLoc}\n\nAdditional Notes:\n${desc}`; } else if (category === 'New Device Peripherals') { const selectedPeripheral = document.getElementById('peripheralList').value; desc = `[NEW PERIPHERAL REQUEST]\nRequested Item: ${selectedPeripheral}\n\nAdditional Notes:\n${desc}`; }
-    const phoneNumber = document.getElementById('phoneNumber').value.trim(); const fullPhone = phoneNumber ? `(${document.getElementById('countryCode').value}) ${phoneNumber}` : "N/A";
-    let fileData = null, fileName = null, fileMimeType = null;
-    if (fileInput && fileInput.files.length > 0) {
-        const file = fileInput.files[0]; if (file.size > 5 * 1024 * 1024) { alert("File too large. Max 5MB allowed."); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false; return; }
-        fileName = file.name; fileMimeType = file.type; fileData = await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(file); });
-    }
-    const payload = { action: "create_ticket", id: "", name: document.getElementById('ticketName').value.trim(), company: document.getElementById('ticketCompany').value.trim(), phone: fullPhone, email: document.getElementById('ticketEmail').value.trim(), request_type: reqType, category: category, impact_level: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, asset: document.getElementById('assetTag') ? document.getElementById('assetTag').value : "N/A", device: category, remote_support: remoteSupportStr, priority: reqType === 'Service' ? 'Low' : document.getElementById('priority').value, subject: document.getElementById('ticketSubject').value, description: desc, date: new Date().toISOString(), status: status, fileData: fileData, fileName: fileName, fileMimeType: fileMimeType };
-    try { const res = await apiPost(payload); const data = await res.json(); alert(`Ticket ${data.id} Submitted!\nStatus: ${status}`); document.getElementById('ticketForm').reset(); toggleNewTicketForm(); fetchClientTickets(); if (clientSession && clientSession.role === 'Approver') fetchApproverTickets(); } catch (e) { alert('Error submitting ticket. Try without attachment if it persists.'); }
-    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit Ticket'; btn.disabled = false;
-}
-
-// ==========================================
-// KNOWLEDGE BASE ENGINE
-// ==========================================
-function toggleKB(btn) {
-    const item = btn.parentElement;
-    document.querySelectorAll('.kb-item').forEach(el => { if (el !== item) { const content = el.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); const icon = el.querySelector('i.kb-icon'); if (icon) icon.classList.remove('rotate-180'); } });
-    const content = item.querySelector('.kb-item-content'); const icon = item.querySelector('i.kb-icon');
-    if (content.classList.contains('hidden')) { content.classList.remove('hidden'); icon.classList.add('rotate-180'); } else { content.classList.add('hidden'); icon.classList.remove('rotate-180'); }
-}
-function filterKB(e) {
-    const input = document.getElementById('kbSearchInput').value.toLowerCase(); const items = document.querySelectorAll('.kb-item'); let found = false;
-    items.forEach(item => { if (item.innerText.toLowerCase().includes(input)) { item.style.display = "block"; found = true; } else { item.style.display = "none"; const content = item.querySelector('.kb-item-content'); if (content) content.classList.add('hidden'); } });
-    document.getElementById('kbNoResults').style.display = (!found && input.trim() !== '') ? 'block' : 'none';
-    if (e && e.key === 'Enter' && input.trim() !== '') searchGoogle();
-}
-function searchGoogle() {
-    const query = document.getElementById('kbSearchInput').value.trim();
-    if (query) window.open('https://www.google.com/search?q=' + encodeURIComponent(query + " troubleshooting IT support"), '_blank');
-}
-
-// ==========================================
-// ANALYTICS & EXPORT ENGINE
-// ==========================================
-function updateChart(tickets) {
-    const ctx = document.getElementById('monthlyChart'); if (!ctx) return;
-    const monthlyCounts = {};
-    tickets.forEach(t => { try { const d = new Date(t.date); const monthYear = d.toLocaleString('default', { month: 'short', year: 'numeric' }); if (monthYear !== "Invalid Date") { monthlyCounts[monthYear] = (monthlyCounts[monthYear] || 0) + 1; } } catch (e) { } });
-    const labels = Object.keys(monthlyCounts).sort((a, b) => new Date(a) - new Date(b)); const data = labels.map(l => monthlyCounts[l]);
-    chartDataExport = labels.map((l, i) => ({ Month: l, Total_Tickets: data[i] }));
-    if (monthlyChartInstance) monthlyChartInstance.destroy();
-    monthlyChartInstance = new Chart(ctx.getContext('2d'), {
-        type: 'line', data: { labels: labels, datasets: [{ label: 'Service Requests', data: data, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.08)', borderWidth: 3, fill: true, tension: 0.3, pointBackgroundColor: '#2563eb', pointRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } } } }
-    });
-}
-
-function renderCompanyGrid() {
-    const grid = document.getElementById('companyCardsGrid'); if (!grid) return;
-    const comps = [...new Set(nocDashboardTickets.map(t => t.company).filter(Boolean))]; let html = '';
-    comps.forEach(c => {
-        let tCount = nocDashboardTickets.filter(t => t.company === c).length;
-        html += `<div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"><div class="flex items-center gap-4"><div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold border border-blue-100"><i class="fa-solid fa-building"></i></div><div><h4 class="font-black text-slate-800 text-sm">${escapeHTML(c)}</h4><p class="text-xs text-slate-500 font-medium">Active Infrastructure</p></div></div><h3 class="text-2xl font-black text-blue-600">${tCount}</h3></div>`;
-    });
-    grid.innerHTML = html || '<p class="text-slate-500 text-sm">No ticket data available.</p>';
-}
-
-function exportGlobalQueueExcel() {
-    if (nocDashboardTickets.length === 0) return alert("No data to export.");
-    const cleanData = nocDashboardTickets.map(t => ({ "Ticket ID": t.id, "Date": t.date, "Company": t.company, "Requester": t.name, "Email": t.email, "Phone": t.phone, "Type": t.request_type, "Category": t.category, "Priority": t.priority, "Asset/Host": t.asset, "Subject": t.subject, "Status": t.status, "Assigned To": t.assigned_to, "Remote ID": t.remote_support }));
-    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Global Queue"); XLSX.writeFile(wb, "SpreadIT_GlobalQueue.xlsx");
-}
-
-function exportFullRawTickets() {
-    if (nocDashboardTickets.length === 0) return alert("No data to export.");
-    const cleanData = nocDashboardTickets.map(t => { let d = { ...t }; delete d.chat_history; delete d.fileData; return d; });
-    const ws = XLSX.utils.json_to_sheet(cleanData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Raw Tickets Data"); XLSX.writeFile(wb, "SpreadIT_Raw_Tickets_Data.xlsx");
-}
-
-function exportChartExcel() {
-    if (chartDataExport.length === 0) return alert("No chart data to export.");
-    const ws = XLSX.utils.json_to_sheet(chartDataExport); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Monthly Analytics"); XLSX.writeFile(wb, "SpreadIT_Monthly_Analytics.xlsx");
-}
-
-function exportChartPPT() {
-    if (chartDataExport.length === 0) return alert("No chart data to export.");
-    let pptx = new PptxGenJS(); let slide = pptx.addSlide(); slide.addText("Monthly Ticketing Analytics", { x: 0.5, y: 0.5, fontSize: 24, color: '363636', bold: true });
-    let tableData = [["Month", "Total Tickets"]]; chartDataExport.forEach(r => tableData.push([r.Month, r.Total_Tickets]));
-    slide.addTable(tableData, { x: 0.5, y: 1.5, w: 8, fill: 'F1F1F1', fontSize: 14, color: '363636' }); pptx.writeFile({ fileName: "SpreadIT_Analytics.pptx" });
-}
-
-function exportChartPDF() {
-    if (chartDataExport.length === 0) return alert("No chart data to export.");
-    const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(20); doc.text("Monthly Ticketing Analytics", 14, 22); doc.setFontSize(12);
-    let startY = 40; doc.text("Month", 14, startY); doc.text("Total Tickets", 80, startY); startY += 10;
-    chartDataExport.forEach(r => { doc.text(String(r.Month), 14, startY); doc.text(String(r.Total_Tickets), 80, startY); startY += 10; });
-    doc.save("SpreadIT_Analytics.pdf");
 }
