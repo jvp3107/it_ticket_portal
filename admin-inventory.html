@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asset Inventory | Spread Technical</title>
+    <title>Register Asset | Spread Technical</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body class="flex flex-col min-h-screen font-sans antialiased bg-slate-50">
     
-    <!-- GLOBAL HEADER -->
     <header class="glass-header sticky top-0 z-40 shadow-sm">
         <div class="max-w-[1600px] mx-auto px-4 h-20 flex justify-between items-center">
             <div class="flex items-center gap-4">
@@ -28,58 +26,118 @@
 
     <main class="flex-grow max-w-[1500px] mx-auto px-4 py-8 w-full relative z-10">
         
-        <!-- Navigation Tabs -->
+        <!-- NEW 6-TAB NAVIGATION -->
         <div class="admin-nav-container mb-10 mx-auto w-fit text-center overflow-x-auto max-w-full bg-white/90">
             <button onclick="switchNocTab('all')" id="nocTab-all" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-layer-group"></i> Global Queue</button>
             <button onclick="switchNocTab('visits')" id="nocTab-visits" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-map-location-dot"></i> Field Visits</button>
-            <button onclick="switchNocTab('inventory')" id="nocTab-inventory" class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-boxes-stacked"></i> Asset Inventory</button>
+            <button onclick="switchNocTab('inventory')" id="nocTab-inventory" class="ent-tab-btn ent-tab-active whitespace-nowrap"><i class="fa-solid fa-laptop-medical"></i> Register Asset</button>
+            <button onclick="switchNocTab('roster')" id="nocTab-roster" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-server"></i> Infra Roster</button>
             <button onclick="switchNocTab('analytics')" id="nocTab-analytics" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-chart-pie"></i> Analytics & Exports</button>
             <button onclick="switchNocTab('admin')" id="nocTab-admin" class="ent-tab-btn ent-tab-inactive whitespace-nowrap"><i class="fa-solid fa-users-gear"></i> Admin Management</button>
         </div>
 
-        <div class="flex flex-col gap-8 w-full max-w-[1400px] mx-auto animate-fade-in">
+        <div class="flex flex-col gap-8 w-full max-w-[1200px] mx-auto animate-fade-in">
             <div class="text-center">
-                <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Enterprise Asset Management</h2>
-                <p class="text-slate-500 mt-3 font-medium">Provision hardware, track lifecycle metrics, and manage client infrastructure.</p>
+                <h2 class="text-4xl font-black text-slate-800 drop-shadow-sm">Asset Registration</h2>
+                <p class="text-slate-500 mt-3 font-medium">Provision new hardware into the corporate directory.</p>
             </div>
             
-            <!-- REGISTRATION FORM -->
             <div class="glass-panel rounded-[32px] p-8 shadow-md border-t-4 border-indigo-500 bg-white">
-                <h3 class="font-black text-slate-800 text-2xl mb-8 flex items-center"><i class="fa-solid fa-laptop-medical text-indigo-600 mr-3"></i> Register Corporate Asset</h3>
+                
+                <!-- NEW OCR AUTO-FILL ENGINE -->
+                <div class="bg-indigo-50/50 border border-indigo-200 p-6 rounded-[24px] mb-8 relative">
+                    <h4 class="text-[11px] font-bold text-indigo-600 mb-2 uppercase tracking-widest flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Auto-Fill from System Audit</h4>
+                    <p class="text-xs text-slate-500 mb-4 font-medium">Paste your raw system properties text here to instantly populate the dropdowns below.</p>
+                    <textarea id="invRawOcrText" rows="3" class="w-full p-4 text-xs font-mono bg-white border border-indigo-200 rounded-xl shadow-inner focus:outline-none focus:border-indigo-400" placeholder="Hostname : PC-01&#10;Processor : Intel(R) Core(TM) Ultra 7 255U&#10;Total RAM : 16 GB..."></textarea>
+                    <button type="button" onclick="autoFillFromText()" class="absolute bottom-10 right-10 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg text-xs font-bold shadow-md transition-colors active:scale-95">Parse & Fill Form</button>
+                </div>
+
                 <form onsubmit="saveAsset(event)" class="space-y-6">
-                    
                     <!-- Section 1: Asset Identity -->
                     <div class="bg-slate-50/80 border border-slate-200 p-6 rounded-[24px]">
                         <h4 class="text-[11px] font-bold text-slate-500 mb-4 uppercase tracking-widest flex items-center"><i class="fa-solid fa-id-card mr-2"></i> Asset Identity & Assignment</h4>
                         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invAssetTag" required class="itsm-input pl-4 bg-white" placeholder=" "><span class="itsm-label">Asset ID / Tag *</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invHostname" class="itsm-input pl-4 bg-white" placeholder=" "><span class="itsm-label">Hostname</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invSerialNumber" class="itsm-input pl-4 bg-white" placeholder=" "><span class="itsm-label">Serial Number</span></div>
-                            <div class="itsm-input-wrapper mb-0"><select id="invCompany" required class="itsm-input appearance-none pl-4 bg-white cursor-pointer"></select><span class="itsm-label">Client Company *</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invLoggedInUser" class="itsm-input pl-4 bg-white" placeholder=" "><span class="itsm-label">Logged-in User</span></div>
+                            <!-- Only 3 Manual Text Inputs allowed -->
+                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invAssetTag" required class="itsm-input pl-4 bg-white" placeholder=" " autocomplete="off"><span class="itsm-label">Asset ID / Tag *</span></div>
+                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invHostname" class="itsm-input pl-4 bg-white" placeholder=" " autocomplete="off"><span class="itsm-label">Hostname</span></div>
+                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invSerialNumber" required class="itsm-input pl-4 bg-white border-blue-400" placeholder=" " autocomplete="off"><span class="itsm-label text-blue-600 font-bold">Serial Number *</span></div>
+                            
+                            <!-- Dynamic Dropdowns -->
+                            <div class="itsm-input-wrapper mb-0"><select id="invCompany" required onchange="filterInventoryUsers(); this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer"><option value="" disabled selected></option></select><span class="itsm-label">Client Company *</span></div>
+                            <div class="itsm-input-wrapper mb-0"><select id="invLoggedInUser" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer"><option value="" disabled selected></option><option value="IT Stock">IT Stock (Unassigned)</option></select><span class="itsm-label">Logged-in User</span></div>
                         </div>
                     </div>
 
-                    <!-- Section 2: Hardware Specs -->
+                    <!-- Section 2: Hardware Specs (ALL DROPDOWNS) -->
                     <div class="bg-indigo-50/30 border border-indigo-100 p-6 rounded-[24px]">
                         <h4 class="text-[11px] font-bold text-indigo-500 mb-4 uppercase tracking-widest flex items-center"><i class="fa-solid fa-microchip mr-2"></i> Hardware Specifications</h4>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invMake" class="itsm-input pl-4 bg-white" placeholder="e.g. Lenovo"><span class="itsm-label">Make / Manufacturer</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invModel" class="itsm-input pl-4 bg-white" placeholder="e.g. ThinkPad T14"><span class="itsm-label">Model</span></div>
-                            <div class="itsm-input-wrapper mb-0"><select id="invSystemType" class="itsm-input appearance-none pl-4 bg-white"><option value="" disabled selected></option><option value="Laptop">Laptop</option><option value="Desktop">Desktop</option><option value="Server">Server</option><option value="Virtual Machine">Virtual Machine</option><option value="Other">Other</option></select><span class="itsm-label">System Type</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invRAM" class="itsm-input pl-4 bg-white" placeholder="e.g. 16 GB"><span class="itsm-label">Total RAM</span></div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="invMake" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                    <option value="" disabled selected></option>
+                                    <option value="Lenovo">Lenovo</option>
+                                    <option value="Dell">Dell</option>
+                                    <option value="HP">HP</option>
+                                    <option value="Apple">Apple</option>
+                                    <option value="Asus">Asus</option>
+                                    <option value="Acer">Acer</option>
+                                </select>
+                                <span class="itsm-label">Make / Manufacturer</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="invModel" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                    <option value="" disabled selected></option>
+                                    <optgroup label="Lenovo"><option value="ThinkPad T14">ThinkPad T14</option><option value="ThinkPad X1 Carbon">ThinkPad X1 Carbon</option><option value="ThinkBook">ThinkBook</option></optgroup>
+                                    <optgroup label="Dell"><option value="Latitude 5000">Latitude 5000</option><option value="Latitude 7000">Latitude 7000</option><option value="XPS 15">XPS 15</option></optgroup>
+                                    <optgroup label="Apple"><option value="MacBook Pro 14">MacBook Pro 14</option><option value="MacBook Air">MacBook Air</option></optgroup>
+                                </select>
+                                <span class="itsm-label">Model Series</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0"><select id="invSystemType" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer"><option value="" disabled selected></option><option value="Laptop">Laptop</option><option value="Desktop">Desktop</option><option value="Server">Server</option><option value="Virtual Machine">Virtual Machine</option><option value="Other">Other</option></select><span class="itsm-label">System Type</span></div>
+                            <div class="itsm-input-wrapper mb-0"><select id="invRAM" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer"><option value="" disabled selected></option><option value="8 GB">8 GB</option><option value="16 GB">16 GB</option><option value="24 GB">24 GB</option><option value="32 GB">32 GB</option><option value="64 GB">64 GB</option><option value="128 GB">128 GB</option></select><span class="itsm-label">Total RAM</span></div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <!-- Processor AutoComplete Datalist -->
                             <div class="itsm-input-wrapper mb-0">
-                                <input type="text" id="invProcessor" list="processorList" class="itsm-input pl-4 bg-white" placeholder="e.g. Intel Core Ultra 7 255U">
+                                <input type="text" id="invProcessor" list="processorList" class="itsm-input pl-4 bg-white" placeholder=" " autocomplete="off" oninput="this.classList.add('has-val');">
                                 <datalist id="processorList"></datalist>
                                 <span class="itsm-label">Processor</span>
                             </div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invCoresThreads" class="itsm-input pl-4 bg-white" placeholder="e.g. 12 cores / 14 threads"><span class="itsm-label">Cores / Threads</span></div>
-                            <div class="itsm-input-wrapper mb-0"><input type="text" id="invGraphics" class="itsm-input pl-4 bg-white" placeholder="e.g. Intel(R) Graphics [2 GB]"><span class="itsm-label">Graphics Card</span></div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="invCoresThreads" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                    <option value="" disabled selected></option>
+                                    <option value="4 cores / 8 threads">4 cores / 8 threads</option>
+                                    <option value="6 cores / 12 threads">6 cores / 12 threads</option>
+                                    <option value="8 cores / 16 threads">8 cores / 16 threads</option>
+                                    <option value="12 cores / 14 threads">12 cores / 14 threads</option>
+                                    <option value="16 cores / 22 threads">16 cores / 22 threads</option>
+                                    <option value="24 cores / 32 threads">24 cores / 32 threads</option>
+                                </select>
+                                <span class="itsm-label">Cores / Threads</span>
+                            </div>
+                            <div class="itsm-input-wrapper mb-0">
+                                <select id="invGraphics" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                    <option value="" disabled selected></option>
+                                    <option value="Intel(R) Graphics [Shared]">Intel(R) Graphics [Shared]</option>
+                                    <option value="Intel(R) Graphics [2 GB]">Intel(R) Graphics [2 GB]</option>
+                                    <option value="Intel(R) Iris Xe Graphics">Intel(R) Iris Xe Graphics</option>
+                                    <option value="AMD Radeon Graphics">AMD Radeon Graphics</option>
+                                    <option value="Apple Integrated GPU">Apple Integrated GPU</option>
+                                    <option value="NVIDIA RTX 4060 [8 GB]">NVIDIA RTX 4060 [8 GB]</option>
+                                    <option value="NVIDIA RTX 4070 [8 GB]">NVIDIA RTX 4070 [8 GB]</option>
+                                </select>
+                                <span class="itsm-label">Graphics Card</span>
+                            </div>
                         </div>
                         <div class="itsm-input-wrapper mb-0">
-                            <textarea id="invStorage" rows="2" class="itsm-input py-3 pl-4 bg-white rounded-2xl" placeholder="e.g. 1TB NVMe Samsung 980, 500GB Seagate HDD"></textarea>
+                            <select id="invStorage" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                <option value="" disabled selected></option>
+                                <option value="256 GB NVMe SSD">256 GB NVMe SSD</option>
+                                <option value="512 GB NVMe SSD">512 GB NVMe SSD</option>
+                                <option value="1 TB NVMe SSD">1 TB NVMe SSD</option>
+                                <option value="2 TB NVMe SSD">2 TB NVMe SSD</option>
+                                <option value="512GB SSD + 1TB HDD">512GB SSD + 1TB HDD</option>
+                            </select>
                             <span class="itsm-label">Storage - Physical Disks</span>
                         </div>
                     </div>
@@ -89,37 +147,45 @@
                         <div class="bg-emerald-50/30 border border-emerald-100 p-6 rounded-[24px]">
                             <h4 class="text-[11px] font-bold text-emerald-600 mb-4 uppercase tracking-widest flex items-center"><i class="fa-brands fa-windows mr-2"></i> Software Specs</h4>
                             <div class="space-y-4">
-                                <div class="itsm-input-wrapper mb-0"><input type="text" id="invOsName" class="itsm-input pl-4 bg-white" placeholder="e.g. Windows 11 Pro"><span class="itsm-label">OS Name</span></div>
+                                <div class="itsm-input-wrapper mb-0">
+                                    <select id="invOsName" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                        <option value="" disabled selected></option>
+                                        <option value="Windows 11 Pro">Windows 11 Pro</option>
+                                        <option value="Windows 11 Enterprise">Windows 11 Enterprise</option>
+                                        <option value="Windows 10 Pro">Windows 10 Pro</option>
+                                        <option value="macOS">macOS</option>
+                                        <option value="Ubuntu Linux">Ubuntu Linux</option>
+                                    </select>
+                                    <span class="itsm-label">OS Name</span>
+                                </div>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div class="itsm-input-wrapper mb-0"><input type="text" id="invOsVersion" class="itsm-input pl-4 bg-white" placeholder="e.g. 23H2 22631"><span class="itsm-label">OS Version / Build</span></div>
-                                    <div class="itsm-input-wrapper mb-0"><select id="invArchitecture" class="itsm-input appearance-none pl-4 bg-white"><option value="64-bit" selected>64-bit</option><option value="32-bit">32-bit</option><option value="ARM64">ARM64</option></select><span class="itsm-label">Architecture</span></div>
+                                    <div class="itsm-input-wrapper mb-0">
+                                        <select id="invOsVersion" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer">
+                                            <option value="" disabled selected></option>
+                                            <option value="26H2 (2026 Update)">26H2 (2026 Update)</option>
+                                            <option value="25H2">25H2</option>
+                                            <option value="24H2">24H2</option>
+                                            <option value="23H2 22631">23H2 22631</option>
+                                            <option value="22H2 22621">22H2 22621</option>
+                                            <option value="macOS 15 (Sequoia)">macOS 15 (Sequoia)</option>
+                                            <option value="macOS 14 (Sonoma)">macOS 14 (Sonoma)</option>
+                                        </select>
+                                        <span class="itsm-label">OS Version / Build</span>
+                                    </div>
+                                    <div class="itsm-input-wrapper mb-0"><select id="invArchitecture" onchange="this.classList.add('has-val');" class="itsm-input appearance-none pl-4 bg-white cursor-pointer"><option value="" disabled selected></option><option value="64-bit">64-bit</option><option value="32-bit">32-bit</option><option value="ARM64">ARM64</option></select><span class="itsm-label">Architecture</span></div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="bg-amber-50/30 border border-amber-100 p-6 rounded-[24px] flex flex-col">
                             <h4 class="text-[11px] font-bold text-amber-600 mb-4 uppercase tracking-widest flex items-center"><i class="fa-solid fa-arrows-spin mr-2"></i> Lifecycle & Notes</h4>
-                            <div class="itsm-input-wrapper mb-4"><select id="invStatus" class="itsm-input appearance-none pl-4 bg-white font-bold"><option value="Active" selected>Active</option><option value="In Repair">In Repair</option><option value="Retired">Retired / Deprecated</option></select><span class="itsm-label">Status</span></div>
-                            <div class="itsm-input-wrapper mb-0 flex-grow"><textarea id="invNotes" class="itsm-input py-3 pl-4 bg-white h-full rounded-2xl" placeholder="Additional internal notes..."></textarea><span class="itsm-label">Notes</span></div>
+                            <div class="itsm-input-wrapper mb-4"><select id="invStatus" class="itsm-input appearance-none pl-4 bg-white font-bold cursor-pointer has-val"><option value="Active" selected>Active</option><option value="In Repair">In Repair</option><option value="Retired">Retired / Deprecated</option></select><span class="itsm-label">Status</span></div>
+                            <div class="itsm-input-wrapper mb-0 flex-grow"><textarea id="invNotes" class="itsm-input py-3 pl-4 bg-white h-full rounded-2xl" placeholder=" "></textarea><span class="itsm-label">Additional internal notes...</span></div>
                         </div>
                     </div>
 
                     <button type="submit" id="btnSaveAsset" class="w-full h-[56px] bg-indigo-600 text-white font-bold rounded-full shadow-md hover:-translate-y-0.5 hover:bg-indigo-500 transition-all text-sm mt-4"><i class="fa-solid fa-server mr-2"></i> Provision Asset in Database</button>
                 </form>
-            </div>
-            
-            <!-- INVENTORY GRID -->
-            <div class="glass-panel rounded-[32px] p-8 flex flex-col shadow-md bg-white mb-10">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-5">
-                    <h3 class="font-black text-slate-800 text-2xl whitespace-nowrap"><i class="fa-solid fa-server text-blue-600 mr-3"></i> Infrastructure Roster</h3>
-                    <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end items-center">
-                        <select id="inventoryCompanyFilter" onchange="updateInventoryUserFilter(); renderInventory();" class="px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-inner"><option value="All">All Companies</option></select>
-                        <select id="inventoryUserFilter" onchange="renderInventory()" class="px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-bold outline-none cursor-pointer text-slate-700 shadow-inner"><option value="All">All Users</option></select>
-                        <button onclick="fetchInventory()" class="w-11 h-11 flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-600 rounded-full hover:bg-white transition active:scale-95 shadow-sm" title="Refresh Inventory"><i class="fa-solid fa-rotate"></i></button>
-                        <button onclick="exportInventoryExcel()" class="px-5 py-2.5 bg-emerald-600 text-white border border-emerald-500 font-bold text-sm rounded-full hover:bg-emerald-500 transition active:scale-95 shadow-md flex items-center gap-2"><i class="fa-solid fa-file-excel"></i> Export</button>
-                    </div>
-                </div>
-                <div id="inventoryContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto max-h-[900px] pr-2"></div>
             </div>
         </div>
     </main>
